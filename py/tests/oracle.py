@@ -9,7 +9,8 @@ comparison. This is stronger than an MPFR oracle (high precision, not exact)
 and adds no external dependency. It exercises the same Nim algorithms the
 library ships, through the C ABI.
 
-Bounds (``u = 2^-52``, ``E = sum|x_i|``, ``n = len``), first order:
+Bounds (``u = 2^-53`` binary64 unit roundoff, half the machine epsilon
+``2u = 2^-52``; ``E = sum|x_i|``, ``n = len``), first order:
 
     naive:                (n-1) u / (1 - (n-1) u) * E        [Higham 2002 (4.4)]
     pairwise / iterative: ceil(log2 n) u / (1 - ceil(log2 n) u) * E  [(4.3)]
@@ -31,8 +32,10 @@ References:
 """
 from fractions import Fraction
 
-# float64 unit roundoff (roundTiesToEven): u = 2^-52.
-U = Fraction(1) / (1 << 52)
+# float64 unit roundoff (roundTiesToEven): u = 2^-53, half the machine
+# epsilon 2u = 2^-52. The published bounds (Higham 2002, Hallman & Ipsen 2022)
+# are stated in u, so this is the value the oracle must use.
+U = Fraction(1) / (1 << 53)
 
 # Safety margin on the compensated bounds (test only; not part of the theorem).
 _COMP_SAFETY = 2
