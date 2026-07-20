@@ -13,7 +13,7 @@
 ## module track and compensate for these errors.
 ##
 ## Correctness assumptions (IEEE-754)
-## =================================
+## ==================================
 ##
 ## The EFTs are exact only under all of:
 ##   1. `roundTiesToEven` (the IEEE-754 default).
