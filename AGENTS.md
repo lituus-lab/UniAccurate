@@ -7,6 +7,7 @@
 ```bash
 nimble install -y
 nimble testAll    # Nim debug + release + C ABI
+nimble simd       # SIMD tests, -d:simd (AVX2 amd64, NEON arm64)
 nimble pyTest     # Cython + pytest (needs libUniAccurate.so)
 nimble example
 nimble coverage   # gcov + lcov -> coverage/ (needs lcov; linux/macOS)
@@ -16,7 +17,7 @@ nimble docs       # nimib book + API reference -> pages/ (needs nimib)
 `nimble docs` needs a complete Nim distribution: `--project` builds `dochack`,
 which Homebrew's `nim` omits (no `tools/`). choosenim and the CI action ship it.
 
-CI: 3-OS Nim matrix + C ABI (linux/macOS) + Python.
+CI: 3-OS Nim matrix + C ABI (linux/macOS) + Python + SIMD (ubuntu AVX2, macOS NEON).
 
 ## Testing
 
@@ -50,6 +51,9 @@ Three tiers, each catching what the others cannot:
   `src/UniAccurate/c_api.nim`; `tests/c` links the header against the lib.
   Built `--app:staticlib`/`--app:lib --noMain --mm:arc -d:release`.
 - C symbols `ua_*`; lib `libUniAccurate`; header `UniAccurate.h`.
+- SIMD layer (`-d:simd`, ADR-0005): dispatch at the umbrella and C ABI, never in
+  `algorithms/` (vgraph back-edge). Compensated SIMD returns `(T, bool)`; the C
+  ABI falls back to the scalar algorithm when `reliable = false`. No FMA in v1.
 - `book/index.nim` is nimib: its code blocks are compiled and run at docs build,
   so prose that outlives its API breaks the build. `py/notebooks/quickstart.ipynb`
   plays the same role for Python and renders natively on GitHub.

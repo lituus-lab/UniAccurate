@@ -76,6 +76,30 @@ jobs:
             libUniAccurate.dylib
             libUniAccurate.a
             libUniAccurate.lib
+  simd:
+    name: SIMD (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu = amd64 AVX2; macos = arm64 NEON. AVX-512 is not guaranteed on
+        # GitHub runners, so the Zen4 path stays a manual FreeBSD check.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.10'
+      - run: nimble install -y
+      - name: AVX2 Nim tests (amd64)
+        if: runner.os == 'Linux'
+        run: nimble simdAvx2
+      - name: NEON Nim tests (arm64)
+        if: runner.os == 'macOS'
+        run: nimble simd
+      - run: nimble testSimd
+      - run: nimble ctestSimd
+
   python:
     name: Python (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
