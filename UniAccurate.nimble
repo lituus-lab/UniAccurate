@@ -10,9 +10,7 @@ srcDir        = "src"
 
 requires "nim >= 2.0.0"
 requires "https://github.com/lbartoletti/NimContracts#fix/generic-proc-support"
-# SIMD backend, pinned to the fork branch that carries AVX-512 (PR guzba/nimsimd#33)
-# and the NEON extras upstream master lacks. Optional: only pulled into a build
-# that passes `-d:simd` (config.nims); the scalar build never imports it.
+# SIMD backend (AVX-512 + NEON), gated by `-d:simd`.
 requires "https://github.com/lbartoletti/nimsimd#neon-avx512"
 
 task lint, "Fail if nimpretty would reformat a source":
@@ -95,6 +93,11 @@ const
     when defined(macosx): " --passL:\"-Wl,-install_name,@rpath/" & sharedLib & "\""
     else: ""
 
+  # Host amd64 defaults to AVX2; arm64 needs no flag. config.nims adds the -m.
+  simdArch =
+    when defined(amd64): " -d:avx2"
+    else: ""
+
 task clib, "C shared library":
   exec "nim c --app:lib --noMain --mm:arc -d:release -o:" & sharedLib & macArgs &
        " src/UniAccurate/c_api.nim"
@@ -119,6 +122,36 @@ task ctest, "C ABI tests":
 task cexample, "C demo":
   exec "nimble clibStatic"
   exec makeExe & " -C examples/c"
+
+task simd, "Run test_simd with -d:simd (host-default ISA)":
+  exec "nim c -r -d:simd --path:src -o:build/test_simd tests/test_simd.nim"
+
+task simdAvx2, "Run test_simd with AVX2 (amd64)":
+  exec "nim c -r -d:simd -d:avx2 --path:src -o:build/test_simd_avx2 tests/test_simd.nim"
+
+task simdAvx512, "Run test_simd with AVX-512 (amd64 Zen4)":
+  exec "nim c -r -d:simd -d:avx512 --path:src -o:build/test_simd_avx512 tests/test_simd.nim"
+
+task testSimd, "Scalar Nim tests compiled under -d:simd (host ISA)":
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_eft_simd tests/test_eft.nim"
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_naive_simd tests/test_naivesum.nim"
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_pairwise_simd tests/test_pairwisesum.nim"
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_comp_simd tests/test_compensatedsum.nim"
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_prop_simd tests/test_property.nim"
+
+task clibSimd, "C shared library with -d:simd (host ISA)":
+  exec "nim c --app:lib --noMain --mm:arc -d:release -d:simd" & simdArch &
+       " -o:" & sharedLib & macArgs & " src/UniAccurate/c_api.nim"
+
+task ctestSimd, "C ABI tests with -d:simd (host ISA)":
+  exec "nim c --app:staticlib --noMain --mm:arc -d:release -d:simd" & simdArch &
+       " -o:" & staticLib & " src/UniAccurate/c_api.nim"
+  exec makeExe & " -C tests/c"
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
   exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
