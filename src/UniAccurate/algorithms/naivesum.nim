@@ -32,10 +32,14 @@ import contracts
 
 func naiveSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Left-to-right sum of `x` in the working precision. Empty input is `0`;
-  ## `n - 1` additions for `n` elements.
+  ## `n - 1` additions for `n` elements, starting from `x[0]` so a leading
+  ## signed zero (e.g. `-0.0`) is preserved rather than folded to `+0.0`.
   ensure:
     x.len != 0 or result == T(0)
   body:
-    result = T(0)
-    for xi in x:
-      result += xi
+    if x.len == 0:
+      result = T(0)
+      return
+    result = x[0]
+    for i in 1 ..< x.len:
+      result += x[i]
