@@ -34,7 +34,14 @@ proc ua_sum_naive(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  naiveSum(toOpenArray(arr, 0, int(n) - 1))
+  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  when defined(simd):
+    when simdF64Enabled:
+      naiveSumSimd(s)
+    else:
+      naiveSum(s)
+  else:
+    naiveSum(s)
 
 proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Recursive pairwise sum of `n` doubles at `x`. Empty input is `0`. Never
@@ -43,7 +50,14 @@ proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  pairwiseSum(toOpenArray(arr, 0, int(n) - 1))
+  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  when defined(simd):
+    when simdF64Enabled:
+      pairwiseSumSimd(s)
+    else:
+      pairwiseSum(s)
+  else:
+    pairwiseSum(s)
 
 proc ua_sum_pairwise_iterative(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Iterative (bottom-up) pairwise sum of `n` doubles at `x`. Empty input is
@@ -60,7 +74,15 @@ proc ua_sum_kahan(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  kahanSum(toOpenArray(arr, 0, int(n) - 1))
+  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  when defined(simd):
+    when simdF64Enabled:
+      let (r, reliable) = kahanSumSimd(s)
+      if reliable: r else: kahanSum(s)
+    else:
+      kahanSum(s)
+  else:
+    kahanSum(s)
 
 proc ua_sum_neumaier(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Kahan-Babuska-Neumaier (magnitude-robust) compensated sum of `n` doubles at
@@ -69,7 +91,15 @@ proc ua_sum_neumaier(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  neumaierSum(toOpenArray(arr, 0, int(n) - 1))
+  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  when defined(simd):
+    when simdF64Enabled:
+      let (r, reliable) = neumaierSumSimd(s)
+      if reliable: r else: neumaierSum(s)
+    else:
+      neumaierSum(s)
+  else:
+    neumaierSum(s)
 
 proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Klein two-level compensated sum of `n` doubles at `x`. Empty input is `0`.
@@ -78,6 +108,14 @@ proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  kleinSum(toOpenArray(arr, 0, int(n) - 1))
+  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  when defined(simd):
+    when simdF64Enabled:
+      let (r, reliable) = kleinSumSimd(s)
+      if reliable: r else: kleinSum(s)
+    else:
+      kleinSum(s)
+  else:
+    kleinSum(s)
 
 {.pop.}
