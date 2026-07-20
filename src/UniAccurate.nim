@@ -9,5 +9,8 @@ export twosum
 export naivesum
 export pairwisesum
 export compensatedsum
+when defined(simd):
+  import UniAccurate/simd
+  export simd
 
 const UniAccurateVersion* = "0.1.0"
