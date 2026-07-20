@@ -28,6 +28,14 @@ const char *ua_version(void);
  * Never raises. Single-threaded, reentrant. Null s or e is undefined. */
 void ua_two_sum(double a, double b, double *s, double *e);
 
+/* Sequential / pairwise sums of n doubles at x. Empty input (n == 0, x may be
+ * NULL) is 0. NaN/Inf propagate; opposite-sign overflow can yield NaN (no
+ * fallback). Never raises. Single-threaded, reentrant. Null x with n > 0 is
+ * undefined. */
+double ua_sum_naive(const double *x, size_t n);
+double ua_sum_pairwise(const double *x, size_t n);
+double ua_sum_pairwise_iterative(const double *x, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

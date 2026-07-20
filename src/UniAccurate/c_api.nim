@@ -28,4 +28,29 @@ proc ua_version(): cstring {.exportc, cdecl, dynlib.} =
   ## Static version string; do not free.
   UniAccurateVersionC
 
+proc ua_sum_naive(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Naive (sequential) sum of `n` doubles at `x`. Empty input is `0`. Never
+  ## raises; NaN/Inf propagate. Null `x` with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  naiveSum(toOpenArray(arr, 0, int(n) - 1))
+
+proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Recursive pairwise sum of `n` doubles at `x`. Empty input is `0`. Never
+  ## raises; NaN/Inf propagate (opposite-sign overflow can yield NaN). Null `x`
+  ## with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  pairwiseSum(toOpenArray(arr, 0, int(n) - 1))
+
+proc ua_sum_pairwise_iterative(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Iterative (bottom-up) pairwise sum of `n` doubles at `x`. Empty input is
+  ## `0`. Never raises; NaN/Inf propagate. Null `x` with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  pairwiseSumIterative(toOpenArray(arr, 0, int(n) - 1))
+
 {.pop.}
