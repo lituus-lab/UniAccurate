@@ -41,27 +41,34 @@ task sum, "Summation tests (debug, contracts active)":
 task comp, "Compensated summation tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_comp tests/test_compensatedsum.nim"
 
+task prop, "Randomized property tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_prop tests/test_property.nim"
+
 task test, "Nim tests (debug, contracts active)":
   exec "nimble eft"
   exec "nimble sum"
   exec "nimble comp"
+  exec "nimble prop"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
   exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
   exec "nimble eft"
   exec "nimble sum"
   exec "nimble comp"
+  exec "nimble prop"
 
 task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
   exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testAll, "debug + release + C ABI":
   exec "nimble test"
