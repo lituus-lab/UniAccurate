@@ -1,5 +1,6 @@
 import std/unittest
 import std/math
+import contracts
 import UniAccurate
 
 # Deterministic xorshift64 so the sweeps are reproducible (no RNG state).
@@ -12,15 +13,24 @@ proc next(r: var uint64): uint64 =
   x
 
 proc randomF64(r: var uint64): float64 =
-  # Finite, well-scaled float64 kept in the EFT-exact range: exponent in
-  # [1, 500] so that `a*b` (exp <= 1000) and the Veltkamp split `2^27 * a`
-  # (exp <= 527) both stay finite and normal. Above exp ~2019 the split
-  # overflows (a documented Dekker limitation, not an algorithm bug), so we
-  # stay clear of it here and exercise the exact regime the identity holds in.
-  let expField = uint64(next(r) mod 500 + 1)
+  # Finite, well-scaled float64 kept in the EFT-exact range: exponent field in
+  # [512, 1533] -> exponent in [-511, 510], so `a*b` (exp in [-1022, 1020])
+  # stays normal — no underflow, no overflow — and the Veltkamp split
+  # `2^27 * a` (exp <= 537) stays finite. This is the regime the Dekker and FMA
+  # EFTs agree and the identity holds; the total-underflow and split-overflow
+  # edges are exercised by the dedicated tests below.
+  let expField = uint64(next(r) mod 1022 + 512)
   var bits = expField shl 52
   bits = bits or (next(r) and 0x000F_FFFF_FFFF_FFFF'u64) # random significand
   cast[float64](bits)
+
+proc p2(e: int): float64 =
+  ## Exact `2^e` for `e` in [-1022, 1023] via direct bit construction.
+  cast[float64](uint64(e + 1023) shl 52)
+
+proc p2f(e: int): float32 =
+  ## Exact `2^e` for `e` in [-126, 127] (float32).
+  cast[float32](uint32(e + 127) shl 23)
 
 suite "ulp":
   test "known binades (float64)":
@@ -135,6 +145,39 @@ suite "twoProduct":
       let (p2, e2) = twoProductFMA(a, b)
       check p1 == p2 # value-identical (signed zero tolerated)
       check e1 == e2
+
+  test "split-overflow regime delegates to the exact FMA path (float64)":
+    # 2^1000 * 2^-1000 = 1.0 exactly; the Dekker split of 2^1000 overflows, but
+    # twoProduct delegates to twoProductFMA and recovers e = 0.
+    let (p, e) = twoProduct(p2(1000), p2(-1000))
+    check p == 1.0
+    check e == 0.0
+
+  test "subnormal product is allowed when nonzero (float64)":
+    let (p, e) = twoProductFMA(p2(-500), p2(-500))                 # 2^-1000
+    check p == p2(-1000)
+    check e == 0.0
+
+  when not defined(release) and not defined(danger):
+    # Contract enforcement is debug-only: under -d:release the preconditions
+    # compile away, so the underflow cases stop raising and only the behavior
+    # tests above remain meaningful.
+    test "rejects total product underflow (float64)":
+      expect PreConditionDefect:
+        discard twoProductFMA(p2(-600), p2(-600)) # 2^-1200
+      expect PreConditionDefect:
+        discard twoProduct(p2(-600), p2(-600))
+
+    test "rejects total product underflow (float32)":
+      expect PreConditionDefect:
+        discard twoProductFMA(p2f(-100), p2f(-100))
+      expect PreConditionDefect:
+        discard twoProduct(p2f(-100), p2f(-100))
+
+  test "non-underflow float32 product is exact":
+    let (p, e) = twoProductFMA(p2f(-60), p2f(-60))
+    check p == p2f(-120)
+    check e == 0.0'f32
 
 suite "isNonOverlapping":
   test "disjoint bits":

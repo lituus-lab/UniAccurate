@@ -226,20 +226,35 @@ func twoProduct*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
   ## Dekker's error-free multiplication (no FMA): `a * b = p + e` exactly,
   ## `p = fl(a*b)`, `|e| < ulp(p)`. Uses `split` on each operand; 17 FLOPs.
   ##
-  ## Exactness limit: the identity holds when the split-products `ah*bl`,
-  ## `al*bh`, `al*bl` do not underflow. Near the underflow threshold those
-  ## intermediates lose their last bit(s) to gradual underflow, so `e` may be
-  ## off by one subnormal ULP — `p` stays exact. Use `twoProductFMA` for an
-  ## exact error in that regime. Dekker (1971).
+  ## Exactness limits:
+  ##   * Total product underflow — `a*b` below the smallest subnormal, so
+  ##     `fl(a*b) = 0` while the exact product is nonzero — cannot carry an
+  ##     error; it is rejected by the precondition. Gradual underflow of the
+  ##     split-products (`ah*bl`, `al*bh`, `al*bl`) only degrades `e` by a
+  ##     subnormal ULP; `p` stays exact.
+  ##   * Split overflow — `SplitFactor * a` overflows for `|a|` near `emax`,
+  ##     poisoning `e` with NaN. On FMA-capable targets the overflow regime
+  ##     delegates to `twoProductFMA` (which needs no split) for the exact
+  ##     result; on targets without a cheap FMA it is a documented Dekker
+  ##     limitation, and the postcondition does not assert the bound there.
+  ## Dekker (1971).
   require:
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
+    a == T(0) or b == T(0) or a * b != T(0) # reject total product underflow
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+    classify(result[0]) in {fcInf, fcNan} or
+      classify(result[1]) in {fcNan} or # split-overflow regime (no-FMA fallback)
+      abs(result[1]) <= ulp(result[0])
   body:
     result[0] = a * b
     let (ah, al) = split(a)
     let (bh, bl) = split(b)
+    when defined(useFMA) or defined(amd64) or defined(arm64):
+      # Split overflowed (|operand| near emax): the Dekker error is NaN. Use
+      # the FMA path, which needs no split and is exact here.
+      if classify(ah) == fcNan or classify(bh) == fcNan:
+        return twoProductFMA(a, b)
     result[1] = ((ah * bh - result[0]) + ah * bl + al * bh) + al * bl
 
 # `twoProductFMA` uses the C99 libm `fma`/`fmaf`, which compute `a*b + c` with a
@@ -263,10 +278,13 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
   {.pop.}
 
   func twoProductFMA*(a, b: float64): (float64, float64) {.contractual, inline.} =
-    ## FMA-accelerated error-free multiplication (float64), 2 FLOPs.
+    ## FMA-accelerated error-free multiplication (float64), 2 FLOPs. Exact for
+    ## every finite product that does not totally underflow; a product below
+    ## the smallest subnormal is rejected (see `twoProduct`'s exactness limits).
     require:
       classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
+      a == 0.0 or b == 0.0 or a * b != 0.0
     ensure:
       classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
     body:
@@ -274,10 +292,13 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
       result[1] = libmFma(a, b, -result[0])
 
   func twoProductFMA*(a, b: float32): (float32, float32) {.contractual, inline.} =
-    ## FMA-accelerated error-free multiplication (float32), 2 FLOPs.
+    ## FMA-accelerated error-free multiplication (float32), 2 FLOPs. Exact for
+    ## every finite product that does not totally underflow; a product below
+    ## the smallest subnormal is rejected.
     require:
       classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
+      a == 0.0'f32 or b == 0.0'f32 or a * b != 0.0'f32
     ensure:
       classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
     body:
