@@ -27,3 +27,18 @@ when not defined(scalarUniAccurate):
     switch("passC", "-ffp-contract=off")
     when defined(amd64) and defined(useFMA):
       switch("passC", "-mfma")
+
+## SIMD target flags: `-d:simd` pulls the simd layer; `-d:avx2`/`-d:avx512`
+## select the amd64 ISA (nimsimd branches on them). arm64 NEON is base ISA.
+when defined(simd) and not defined(scalarUniAccurate):
+  when defined(amd64):
+    when defined(avx512):
+      when defined(vcc):
+        switch("passC", "/arch:AVX512")
+      else:
+        switch("passC", "-mavx512f")
+    elif defined(avx2):
+      when defined(vcc):
+        switch("passC", "/arch:AVX2")
+      else:
+        switch("passC", "-mavx2")
