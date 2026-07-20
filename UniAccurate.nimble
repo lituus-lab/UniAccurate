@@ -10,6 +10,10 @@ srcDir        = "src"
 
 requires "nim >= 2.0.0"
 requires "https://github.com/lbartoletti/NimContracts#fix/generic-proc-support"
+# SIMD backend, pinned to the fork branch that carries AVX-512 (PR guzba/nimsimd#33)
+# and the NEON extras upstream master lacks. Optional: only pulled into a build
+# that passes `-d:simd` (config.nims); the scalar build never imports it.
+requires "https://github.com/lbartoletti/nimsimd#neon-avx512"
 
 task lint, "Fail if nimpretty would reformat a source":
   exec "nim c -r --hints:off -o:build/lint_tool tools/lint.nim"
