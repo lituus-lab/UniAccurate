@@ -18,6 +18,27 @@ which Homebrew's `nim` omits (no `tools/`). choosenim and the CI action ship it.
 
 CI: 3-OS Nim matrix + C ABI (linux/macOS) + Python.
 
+## Testing
+
+Three tiers, each catching what the others cannot:
+
+- **Structural tests** (`tests/test_*.nim`, `nimble test`): debug builds with
+  contracts active. `test_eft`, `test_naivesum`, `test_pairwisesum`,
+  `test_compensatedsum` lock exact behavior — empty/single inputs, the
+  compensation win on `0.1·10`, magnitude-robustness, non-finite propagation,
+  and the `s + e == a op b` identity to the last bit.
+- **Randomized property tests** (`tests/test_property.nim`, `nimble prop`):
+  oracle-free invariants at scale on the native path — finite inputs never
+  yield NaN (bounded and overflow-prone, float64 and float32), and every sum
+  agrees exactly on integer data within 2^53. Deterministic xorshift64 so a
+  failure reproduces with no RNG state.
+- **Exact-rational oracle** (`py/tests/test_oracle.py`, `nimble pyTest`):
+  forward-error-bound checks through the C ABI. `fractions.Fraction` gives the
+  exact real sum `S` and magnitude `E`; the bound is computed in the same exact
+  arithmetic, so a failure is a real bound violation, not float noise. Catches
+  a regression the float-level tests cannot (an algorithm that stays finite but
+  drifts past its published error bound).
+
 ## Conventions
 
 - English comments, terse, describe what is done. No "deprecated".
