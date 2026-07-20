@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 # UniAccurate — error-free transforms and accurate summation/dot-product.
 
 version       = "0.1.0"

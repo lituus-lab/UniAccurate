@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 # The Book
 
 Placeholder for the nimib book each `Uni*` library carries. Replace with

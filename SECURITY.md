@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 # Security Policy
 
 Report vulnerabilities privately (email the maintainer — see git history),

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## C ABI for UniAccurate. Built --app:staticlib/--app:lib --noMain --mm:arc -d:release.
 ## Keep in sync with include/UniAccurate.h; tests/c links the header against this lib.
 import std/math

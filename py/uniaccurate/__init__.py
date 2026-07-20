@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 """uniaccurate — Python binding over the UniAccurate C library."""
 from ._core import two_sum as _two_sum_c, version as _version_c
 

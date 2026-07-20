@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## Fails if nimpretty would reformat any source. Checks, never rewrites.
 import std/[os, osproc, strformat, strutils]
 

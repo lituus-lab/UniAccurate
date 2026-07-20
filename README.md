@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 # UniAccurate
 
 Hello-world scaffold: `fibonacci`, in Nim, with a hand-written C ABI and a

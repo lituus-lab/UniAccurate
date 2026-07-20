@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 ## What changes, and why
 
 <!-- The problem, then the fix. Link the issue if there is one. -->

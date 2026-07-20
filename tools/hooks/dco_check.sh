@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 # Local mirror of the CI dco job: a commit must carry a Signed-off-by trailer.
 # pre-commit passes the commit-msg file path as $1.
 set -eu

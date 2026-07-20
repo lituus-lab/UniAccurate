@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## Enforces the dependency directions declared in vgraph.cfg (ADR-0001):
 ## no module imports a higher layer, no `requires` names an undeclared engine.
 ## Line-based scan of import/from/include, which covers the forms Nim sources

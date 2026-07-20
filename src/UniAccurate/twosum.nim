@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## Error-free transformations (EFT)
 ##
 ## The foundation layer of accurate floating-point arithmetic. An EFT computes

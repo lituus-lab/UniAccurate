@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 """Author py/notebooks/quickstart.ipynb, then execute it so the committed file
 carries real outputs for GitHub to render. Run from the repo root:
 
