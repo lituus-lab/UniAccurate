@@ -2,5 +2,6 @@ import std/strutils
 import UniAccurate
 
 echo "UniAccurate " & UniAccurateVersion
-for n in [0, 1, 10, 20, 50, 90, FibMaxN]:
-  echo "fib(" & $n & ") = " & $fibonacci(n)
+for (a, b) in [(1.0, 2.0), (1.0, 2e16), (1e20, 1.0)]:
+  let (s, e) = twoSum(a, b)
+  echo "twoSum(" & $a & ", " & $b & ") = (" & $s & ", " & $e & ")"

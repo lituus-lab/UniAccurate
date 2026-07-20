@@ -1,12 +1,14 @@
 # cython: language_level=3
 cdef extern from "UniAccurate.h":
     const char *ua_version()
-    long long ua_fibonacci(int n)
+    void ua_two_sum(double a, double b, double *s, double *e)
 
 
-def fibonacci(int n):
-    """Raw C call (no domain check). Use uniaccurate.fibonacci."""
-    return ua_fibonacci(n)
+def two_sum(double a, double b):
+    """Raw C call. Returns (s, e) with a + b == s + e exactly."""
+    cdef double s, e
+    ua_two_sum(a, b, &s, &e)
+    return (s, e)
 
 
 def version():

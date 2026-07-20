@@ -1,17 +1,19 @@
 """uniaccurate — Python binding over the UniAccurate C library."""
-from ._core import fibonacci as _fib_c, version as _version_c
+from ._core import two_sum as _two_sum_c, version as _version_c
 
 __version__ = _version_c().decode("ascii")
-_FIB_MAX_N = 92
 
 
-def fibonacci(n):
-    """fib(n) as int. n in [0, 92]; raises ValueError/TypeError out of range."""
-    if not isinstance(n, int):
-        raise TypeError(f"n must be int, got {type(n).__name__}")
-    if not 0 <= n <= _FIB_MAX_N:
-        raise ValueError(f"n must be in [0, {_FIB_MAX_N}], got {n}")
-    return _fib_c(n)
+def two_sum(a, b):
+    """Error-free sum: returns (s, e) with a + b == s + e exactly.
+    s = fl(a + b) (IEEE-754); e carries the rounding error. Non-finite a or b
+    gives s = a + b (IEEE) and e = NaN. Raises TypeError on non-numeric input.
+    """
+    if not isinstance(a, (int, float)) or isinstance(a, bool):
+        raise TypeError(f"a must be a number, got {type(a).__name__}")
+    if not isinstance(b, (int, float)) or isinstance(b, bool):
+        raise TypeError(f"b must be a number, got {type(b).__name__}")
+    return _two_sum_c(float(a), float(b))
 
 
 def version():
@@ -19,4 +21,4 @@ def version():
     return _version_c().decode("ascii")
 
 
-__all__ = ["fibonacci", "version", "__version__"]
+__all__ = ["two_sum", "version", "__version__"]

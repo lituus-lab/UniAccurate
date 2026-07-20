@@ -1,10 +1,15 @@
 #include <stdio.h>
+#include <stddef.h>
 #include "UniAccurate.h"
 
 int main(void) {
   printf("UniAccurate %s\n", ua_version());
-  int ns[] = {0, 1, 10, 20, 50, 90, UNIACCURATE_FIB_MAX_N};
-  for (size_t i = 0; i < sizeof(ns) / sizeof(ns[0]); i++)
-    printf("fib(%d) = %lld\n", ns[i], ua_fibonacci(ns[i]));
+  double as[] = {1.0, 1.0, 1e20};
+  double bs[] = {2.0, 2e16, 1.0};
+  for (size_t i = 0; i < sizeof(as) / sizeof(as[0]); i++) {
+    double s, e;
+    ua_two_sum(as[i], bs[i], &s, &e);
+    printf("ua_two_sum(%g, %g) = (%g, %g)\n", as[i], bs[i], s, e);
+  }
   return 0;
 }
