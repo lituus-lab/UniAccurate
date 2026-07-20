@@ -6,6 +6,9 @@ from ._core import (
     _sum_naive_c,
     _sum_pairwise_c,
     _sum_pairwise_iterative_c,
+    _sum_kahan_c,
+    _sum_neumaier_c,
+    _sum_klein_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -59,6 +62,30 @@ def pairwise_sum_iterative(values):
     return _sum_pairwise_iterative_c(_validate(values))
 
 
+def kahan_sum(values):
+    """Kahan compensated sum. Empty input is 0.0. NaN/Inf propagate; finite
+    inputs never yield NaN (overflow gives ±Inf). Raises TypeError on
+    non-numeric elements.
+    """
+    return _sum_kahan_c(_validate(values))
+
+
+def neumaier_sum(values):
+    """Kahan-Babuska-Neumaier (magnitude-robust) compensated sum. Empty input
+    is 0.0. NaN/Inf propagate; finite inputs never yield NaN. Raises TypeError
+    on non-numeric elements.
+    """
+    return _sum_neumaier_c(_validate(values))
+
+
+def klein_sum(values):
+    """Klein two-level compensated sum (~epsilon^2). Empty input is 0.0.
+    NaN/Inf propagate; finite inputs never yield NaN. Raises TypeError on
+    non-numeric elements.
+    """
+    return _sum_klein_c(_validate(values))
+
+
 def version():
     """C library version string."""
     return _version_c().decode("ascii")
@@ -66,7 +93,10 @@ def version():
 
 __all__ = [
     "__version__",
+    "kahan_sum",
+    "klein_sum",
     "naive_sum",
+    "neumaier_sum",
     "pairwise_sum",
     "pairwise_sum_iterative",
     "two_sum",

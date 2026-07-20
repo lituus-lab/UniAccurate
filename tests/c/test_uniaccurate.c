@@ -45,6 +45,14 @@ int main(void) {
   sum_call("pairwise empty", ua_sum_pairwise, NULL, 0, 0.0);
   sum_call("pairwise_iter empty", ua_sum_pairwise_iterative, NULL, 0, 0.0);
 
+  /* Compensated sums: integer-valued data is exact for all three variants. */
+  sum_call("kahan [1..4]", ua_sum_kahan, small, 4, 10.0);
+  sum_call("neumaier [1..4]", ua_sum_neumaier, small, 4, 10.0);
+  sum_call("klein [1..4]", ua_sum_klein, small, 4, 10.0);
+  sum_call("kahan empty", ua_sum_kahan, NULL, 0, 0.0);
+  sum_call("neumaier empty", ua_sum_neumaier, NULL, 0, 0.0);
+  sum_call("klein empty", ua_sum_klein, NULL, 0, 0.0);
+
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
   return 1;

@@ -53,4 +53,31 @@ proc ua_sum_pairwise_iterative(x: ptr cdouble; n: csize_t): cdouble {.raises: []
   let arr = cast[ptr UncheckedArray[cdouble]](x)
   pairwiseSumIterative(toOpenArray(arr, 0, int(n) - 1))
 
+proc ua_sum_kahan(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Kahan compensated sum of `n` doubles at `x`. Empty input is `0`. Never
+  ## raises; NaN/Inf propagate. Finite inputs never yield NaN (overflow ⇒ ±Inf).
+  ## Null `x` with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  kahanSum(toOpenArray(arr, 0, int(n) - 1))
+
+proc ua_sum_neumaier(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Kahan-Babuska-Neumaier (magnitude-robust) compensated sum of `n` doubles at
+  ## `x`. Empty input is `0`. Never raises; NaN/Inf propagate. Finite inputs
+  ## never yield NaN. Null `x` with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  neumaierSum(toOpenArray(arr, 0, int(n) - 1))
+
+proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Klein two-level compensated sum of `n` doubles at `x`. Empty input is `0`.
+  ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN. Null `x`
+  ## with `n > 0` is undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  kleinSum(toOpenArray(arr, 0, int(n) - 1))
+
 {.pop.}

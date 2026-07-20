@@ -36,6 +36,14 @@ double ua_sum_naive(const double *x, size_t n);
 double ua_sum_pairwise(const double *x, size_t n);
 double ua_sum_pairwise_iterative(const double *x, size_t n);
 
+/* Compensated sums of n doubles at x. Empty input (n == 0, x may be NULL) is
+ * 0. NaN/Inf propagate; finite inputs never yield NaN (overflow ⇒ ±Inf, no
+ * Inf - Inf is evaluated). Never raises. Single-threaded, reentrant. Null x
+ * with n > 0 is undefined. */
+double ua_sum_kahan(const double *x, size_t n);
+double ua_sum_neumaier(const double *x, size_t n);
+double ua_sum_klein(const double *x, size_t n);
+
 #ifdef __cplusplus
 }
 #endif
