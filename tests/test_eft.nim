@@ -3,7 +3,7 @@ import std/math
 import contracts
 import UniAccurate
 
-# Deterministic xorshift64 so the sweeps are reproducible (no RNG state).
+## Deterministic xorshift64 so the sweeps are reproducible (no RNG state).
 proc next(r: var uint64): uint64 =
   var x = r
   x = x xor (x shl 13)
@@ -13,12 +13,12 @@ proc next(r: var uint64): uint64 =
   x
 
 proc randomF64(r: var uint64): float64 =
-  # Finite, well-scaled float64 kept in the EFT-exact range: exponent field in
-  # [512, 1533] -> exponent in [-511, 510], so `a*b` (exp in [-1022, 1020])
-  # stays normal — no underflow, no overflow — and the Veltkamp split
-  # `2^27 * a` (exp <= 537) stays finite. This is the regime the Dekker and FMA
-  # EFTs agree and the identity holds; the total-underflow and split-overflow
-  # edges are exercised by the dedicated tests below.
+  ## Finite, well-scaled float64 kept in the EFT-exact range: exponent field in
+  ## [512, 1533] -> exponent in [-511, 510], so `a*b` (exp in [-1022, 1020])
+  ## stays normal — no underflow, no overflow — and the Veltkamp split
+  ## `2^27 * a` (exp <= 537) stays finite. This is the regime the Dekker and FMA
+  ## EFTs agree and the identity holds; the total-underflow and split-overflow
+  ## edges are exercised by the dedicated tests below.
   let expField = uint64(next(r) mod 1022 + 512)
   var bits = expField shl 52
   bits = bits or (next(r) and 0x000F_FFFF_FFFF_FFFF'u64) # random significand
@@ -52,6 +52,8 @@ suite "ulp":
   test "float32":
     check ulp(1.0'f32) == 1.1920929e-7'f32 # 2^-23
     check ulp(0.0'f32) == 1.0e-45'f32
+    check classify(ulp(float32(NaN))) == fcNan
+    check classify(ulp(float32(Inf))) == fcNan
 
 suite "split":
   test "reconstructs exactly over the normal range":

@@ -76,10 +76,10 @@ uniaccurate.two_sum(1.0, 2e16)   # (2e16, 1.0) — error recovered
 uniaccurate.version()            # '0.1.0'
 ```
 
-Here the input check returns, because Python has exceptions to carry it: a
-non-numeric argument raises `TypeError`. Each surface expresses one contract
-in the terms its own callers expect — a precondition in Nim, a defined
-fallback in C, an exception in Python.
+Here the input check is expressed as an exception, because Python has
+exceptions to carry it: a non-numeric argument raises `TypeError`. Each
+surface expresses one contract in the terms its own callers expect — a
+precondition in Nim, a defined fallback in C, an exception in Python.
 
 `py/notebooks/quickstart.ipynb` runs these calls against an installed wheel
 and renders on GitHub directly.
