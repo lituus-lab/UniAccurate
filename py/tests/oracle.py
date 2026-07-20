@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
+"""Exact rational oracle for summation forward-error bounds.
+
+The exact real sum ``S`` and the input magnitude ``E = sum|x_i|`` are computed
+with ``fractions.Fraction`` (stdlib), so neither the oracle nor the bound is
+rounded: the check ``|fl(alg) - S| <= bound(n, E)`` is an exact rational
+comparison. This is stronger than an MPFR oracle (high precision, not exact)
+and adds no external dependency. It exercises the same Nim algorithms the
+library ships, through the C ABI.
+
+Bounds (``u = 2^-52``, ``E = sum|x_i|``, ``n = len``), first order:
+
+    naive:                (n-1) u / (1 - (n-1) u) * E        [Higham 2002 (4.4)]
+    pairwise / iterative: ceil(log2 n) u / (1 - ceil(log2 n) u) * E  [(4.3)]
+    kahan (no final +c):  (3u + (4n+6) u^2) * E              [Hallman & Ipsen 2022]
+    neumaier/klein (+c):  (2u + (4n+6) u^2) * E              [Higham 2002 (4.8)]
+
+``kahanSum`` returns the running sum without the final ``+ c`` correction, so
+its leading constant is ``3u`` (Hallman & Ipsen 2022, Cor. 4.2); ``neumaierSum``
+and ``kleinSum`` apply a final correction, so ``2u`` (Higham 2002, (4.8)). The
+compensated bounds carry a ``2x`` test safety margin that absorbs the ``O(u^3)``
+tail and the ``u^2`` constant uncertainty; they stay far below the naive bound
+for ``n >= 6``, so a degenerate uncompensated sum is still caught.
+
+References:
+- Higham, N.J. (2002). *Accuracy and Stability of Numerical Algorithms*, 2nd
+  ed., §4.2-4.3. SIAM. ISBN 978-0-89871-521-7.
+- Hallman, E., Ipsen, I.C.F. (2022). "Precision-aware Deterministic and
+  Probabilistic Error Bounds for Floating Point Summation".
+"""
+from fractions import Fraction
+
+# float64 unit roundoff (roundTiesToEven): u = 2^-52.
+U = Fraction(1) / (1 << 52)
+
+# Safety margin on the compensated bounds (test only; not part of the theorem).
+_COMP_SAFETY = 2
+
+
+def exact_sum(values):
+    """Exact real sum of ``values`` (floats coerced to exact rationals)."""
+    return sum(Fraction(v) for v in values)
+
+
+def abs_sum(values):
+    """Exact ``sum|x_i|`` — the magnitude that scales every bound here."""
+    return sum(abs(Fraction(v)) for v in values)
+
+
+def gamma(k: int) -> Fraction:
+    """Higham's ``gamma_k = k*u / (1 - k*u)``; ``0`` for ``k <= 0``."""
+    if k <= 0:
+        return Fraction(0)
+    return U * k / (1 - U * k)
+
+
+def ceil_log2(n: int) -> int:
+    """``ceil(log2(n))`` for ``n >= 2``; ``0`` for ``n <= 1`` (one term is exact)."""
+    if n <= 1:
+        return 0
+    return (n - 1).bit_length()
+
+
+def bound_naive(n: int, e: Fraction) -> Fraction:
+    """Recursive (naive) summation forward bound: ``gamma_{n-1} * E``."""
+    return gamma(n - 1) * e
+
+
+def bound_pairwise(n: int, e: Fraction) -> Fraction:
+    """Pairwise (cascade) forward bound — rounding depth ``ceil(log2 n)``."""
+    return gamma(ceil_log2(n)) * e
+
+
+def bound_compensated(n: int, e: Fraction, leading: int) -> Fraction:
+    """Compensated summation forward bound.
+
+    ``leading`` is ``3`` for Kahan (no final correction, Hallman & Ipsen 2022)
+    and ``2`` for Neumaier/Klein (final ``+ c`` applied, Higham 2002 (4.8)).
+    """
+    return _COMP_SAFETY * (U * leading + (4 * n + 6) * U * U) * e

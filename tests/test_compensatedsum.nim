@@ -5,9 +5,9 @@ import std/math
 import UniAccurate
 
 ## Correctness of the compensated sums (`kahanSum`, `neumaierSum`, `kleinSum`).
-## Rigorous forward-error-bound checks (vs an MPFR oracle) belong with the
-## oracles module; here we lock the structural behavior: empty, single, exact
-## integer sums, the canonical compensation win on `0.1·10`, the
+## Rigorous forward-error-bound checks (vs an exact rational oracle) live in
+## `py/tests/test_oracle.py`; here we lock the structural behavior: empty,
+## single, exact integer sums, the canonical compensation win on `0.1·10`, the
 ## magnitude-robustness distinction (Kahan loses it; Neumaier/Klein recover it),
 ## equality with `naiveSum` on exact data, and non-finite propagation including
 ## the opposite-sign overflow artifact.
