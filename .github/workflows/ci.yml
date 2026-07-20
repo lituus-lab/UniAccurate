@@ -182,7 +182,7 @@ jobs:
           # the installed wheel, never to py/uniaccurate next door.
           work="$RUNNER_TEMP/wheel-check"
           mkdir -p "$work"
-          cp py/tests/test_fibonacci.py "$work/"
+          cp py/tests/*.py "$work/"
           cd "$work"
           python -m pytest -q
       - name: Execute the quickstart notebook against the installed wheel

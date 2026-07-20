@@ -2,17 +2,19 @@
 <!-- Copyright 2026 lituus-lab -->
 # UniAccurate
 
-Hello-world scaffold: `fibonacci`, in Nim, with a hand-written C ABI and a
-Cython Python binding.
+Error-free transforms and accurate summation for floating-point arithmetic:
+naive, pairwise, and compensated sums, in Nim, with a hand-written C ABI and
+a Cython Python binding.
 
 ## Layout
 
 ```
 src/UniAccurate.nim          umbrella module
-src/UniAccurate/fibonacci.nim  Nim core (NimContracts)
+src/UniAccurate/twosum.nim   error-free transforms (NimContracts)
+src/UniAccurate/algorithms/  summation kernels (NimContracts)
 src/UniAccurate/c_api.nim    C ABI
 include/UniAccurate.h        hand-written C header
-tests/test_fibonacci.nim     Nim tests
+tests/test_*.nim             Nim tests (eft, sums, compensated, property)
 tests/c/                     C ABI test (links the header against the lib)
 examples/                    Nim + C demos
 py/                          Cython binding + pytest
