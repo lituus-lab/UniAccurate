@@ -35,7 +35,8 @@ task eft, "EFT tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_eft tests/test_eft.nim"
 
 task sum, "Summation tests (debug, contracts active)":
-  exec "nim c -r --path:src -o:build/test_sum tests/test_naivesum.nim"
+  exec "nim c -r --path:src -o:build/test_naive tests/test_naivesum.nim"
+  exec "nim c -r --path:src -o:build/test_pairwise tests/test_pairwisesum.nim"
 
 task test, "Nim tests (debug, contracts active)":
   exec "nimble eft"
@@ -43,7 +44,8 @@ task test, "Nim tests (debug, contracts active)":
 
 task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_sum_rel tests/test_naivesum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
   exec "nimble eft"
@@ -51,7 +53,8 @@ task testCi, "Nim tests (CI subset, debug)":
 
 task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_sum_rel tests/test_naivesum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
 
 task testAll, "debug + release + C ABI":
   exec "nimble test"
