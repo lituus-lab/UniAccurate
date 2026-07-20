@@ -32,8 +32,8 @@
 ##      (e.g. `a + b` beyond max normal) yields `s = ±Inf`; the error `e` is
 ##      then NaN for `twoSum` (`Inf - Inf` appears in the recovery) and `-Inf`
 ##      for `fastTwoSum` (`b - Inf`). In both cases the identity no longer
-##      holds — the postcondition's `fcInf`/`fcNan` short-circuit prevents the
-##      `|e| <= ulp(s)` bound from reading `<= ulp(Inf) = NaN`.
+##      holds — the postcondition's `fcInf`/`fcNegInf`/`fcNan` short-circuit
+##      prevents the `|e| <= ulp(s)` bound from reading `<= ulp(±Inf) = NaN`.
 ##
 ## Contracts
 ## =========
@@ -173,7 +173,7 @@ func split*[T: SomeFloat](a: T): (T, T) {.contractual, inline.} =
     # Huge normals overflow `SplitFactor*a` to Inf/NaN (recombination fails);
     # subnormals near underflow can round. Tolerate both, mirroring the EFT
     # primitives' overflow handling.
-    classify(result[0]) in {fcInf, fcNan} or
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or
       classify(a) in {fcSubnormal, fcZero, fcNegZero} or
       result[0] + result[1] == a
   body:
@@ -197,7 +197,7 @@ func fastTwoSum*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     abs(a) >= abs(b)
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
   body:
     result[0] = a + b
     result[1] = b - (result[0] - a)
@@ -212,7 +212,7 @@ func twoSum*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
   body:
     result[0] = a + b
     let z = result[0] - a
@@ -233,7 +233,7 @@ func twoSumFast*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
   body:
     if abs(a) >= abs(b):
       result = fastTwoSum(a, b)
@@ -248,7 +248,7 @@ func twoDiff*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
   body:
     result[0] = a - b
     let z = result[0] - a
@@ -275,7 +275,7 @@ func twoProduct*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     a == T(0) or b == T(0) or a * b != T(0) # reject total product underflow
   ensure:
-    classify(result[0]) in {fcInf, fcNan} or
+    classify(result[0]) in {fcInf, fcNegInf, fcNan} or
       classify(result[1]) in {fcNan} or # split-overflow regime (no-FMA fallback)
       abs(result[1]) <= ulp(result[0])
   body:
@@ -318,7 +318,7 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       a == 0.0 or b == 0.0 or a * b != 0.0
     ensure:
-      classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+      classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
     body:
       result[0] = a * b
       result[1] = libmFma(a, b, -result[0])
@@ -332,7 +332,7 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       a == 0.0'f32 or b == 0.0'f32 or a * b != 0.0'f32
     ensure:
-      classify(result[0]) in {fcInf, fcNan} or abs(result[1]) <= ulp(result[0])
+      classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(result[0])
     body:
       result[0] = a * b
       result[1] = libmFmaf(a, b, -result[0])
