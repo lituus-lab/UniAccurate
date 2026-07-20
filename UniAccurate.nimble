@@ -29,17 +29,20 @@ task docs, "API reference + book into pages/ — what CI publishes":
   # The book is the landing page; the generated reference sits under api/.
   cpFile "book/index.html", "pages/index.html"
 
+task eft, "EFT tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_eft tests/test_eft.nim"
+
 task test, "Nim tests (debug, contracts active)":
-  exec "nim c -r --path:src -o:build/test_fibonacci tests/test_fibonacci.nim"
+  exec "nimble eft"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
-  exec "nim c -r -d:release --path:src -o:build/test_fibonacci_rel tests/test_fibonacci.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
-  exec "nim c -r --path:src -o:build/test_fibonacci tests/test_fibonacci.nim"
+  exec "nimble eft"
 
 task testCiRelease, "Nim tests (CI subset, release)":
-  exec "nim c -r -d:release --path:src -o:build/test_fibonacci_rel tests/test_fibonacci.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
 
 task testAll, "debug + release + C ABI":
   exec "nimble test"
@@ -122,7 +125,7 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   rmDir "coverage"
   exec "nim c --path:src --nimcache:" & cache &
        " --debugger:native --passC:--coverage --passL:--coverage" &
-       " -o:build/test_coverage tests/test_fibonacci.nim"
+       " -o:build/test_coverage tests/test_eft.nim"
   exec "./build/test_coverage"
   exec "lcov --capture --directory " & cache & " --base-directory ." &
        " --include \"*/src/UniAccurate/*\" --output-file lcov.info --quiet"
