@@ -6,12 +6,16 @@ nb.title = "UniAccurate"
 nbText: """
 # UniAccurate
 
-A hello-world function, `fibonacci`, exposed across three surfaces: **Nim**,
-a **C ABI**, and a **Python** binding.
+Error-free transformations (EFT) for floating-point arithmetic, exposed across
+three surfaces: **Nim**, a **C ABI**, and a **Python** binding.
 
-This page is a nimib book: every Nim block below is compiled and run when the
-book is built, and the output shown is what the code actually produced. A change
-that breaks the API breaks the docs build, so the two cannot drift apart.
+An EFT computes an operation — here, addition — and returns both the rounded
+result `s = fl(a + b)` and the exact rounding error `e`, such that in real
+arithmetic `a + b = s + e` exactly. The error is not lost; compensated
+summation threads it back through a running sum. This page is a nimib book:
+every Nim block below is compiled and run when the book is built, and the
+output shown is what the code actually produced. A change that breaks the API
+breaks the docs build, so the two cannot drift apart.
 
 ## The Nim surface
 
@@ -22,50 +26,42 @@ nbCode:
   import UniAccurate
 
   echo "version ", UniAccurateVersion
-  echo "fib(10) = ", fibonacci(10)
-  echo "fib(92) = ", fibonacci(92)
+  let (s, e) = twoSum(1.0, 2.0)
+  echo "twoSum(1.0, 2.0) = (", s, ", ", e, ")"
+  let (s2, e2) = twoSum(1.0, 2e16)
+  echo "twoSum(1.0, 2e16) = (", s2, ", ", e2, ")"
 
 nbText: """
-## The domain is part of the contract
+`2e16 + 1` rounds back to `2e16` in float64 — the `1` is below the ULP, so a
+plain `+` drops it. `twoSum` recovers it as `e = 1.0`: the identity `a + b =
+s + e` still holds to the last bit.
 
-`fibonacci` is not defined for every `int`. `FibMaxN` is the largest argument
-whose result still fits in `int64`, and that bound is stated as a precondition
-rather than left to the caller to remember.
-"""
+## The contract is part of the signature
 
-nbCode:
-  echo "FibMaxN = ", FibMaxN
-  echo "fib(FibMaxN) = ", fibonacci(FibMaxN)
+`twoSum` is the Møller–Knuth form: six FLOPs, branchless, no precondition on
+operand ordering. Its postcondition states the non-overlap bound `|e| <=
+½ ulp(s)` for normal `s` — a property cheaper to check than the body is to
+run, and never re-derived by calling the function again.
 
-nbText: """
 The contract is written with NimContracts (`require:` / `ensure:` / `body:`).
 Under `-d:release` it compiles away entirely: the release build pays nothing,
 while debug builds and the test suite catch a violation at the call site.
 
-A postcondition never re-derives the result by calling the function again — it
-states a property cheaper to check than the body is to run. Here, `result >= 0`.
-
 ## The C ABI
 
-The same function, reachable from anything that speaks C. The header is
+The same entry point, reachable from anything that speaks C. The header is
 hand-written and kept in sync with `src/UniAccurate/c_api.nim`; `tests/c` links
-one against the other on every CI run, so a drift is caught rather than shipped.
+one against the other on every CI run, so a drift is caught rather than
+shipped.
 
 ```c
-#define UNIACCURATE_FIB_MAX_N 92
-
 const char *ua_version(void);
-long long   ua_fibonacci(int n);
+void ua_two_sum(double a, double b, double *s, double *e);
 ```
 
-The C ABI **never raises**. Where the Nim function has a precondition, the C
-entry point clamps instead: out-of-range input returns a defined value rather
-than unwinding across the ABI boundary, which would be undefined behaviour.
-
-```c
-ua_fibonacci(-5);   /* 0       — clamped, not a trap */
-ua_fibonacci(200);  /* fib(92) — clamped to the domain */
-```
+The C ABI **never raises**. For non-finite input, `*s` follows IEEE
+arithmetic and `*e` reads `NaN` — an exception must never unwind across the
+ABI boundary, which would be undefined behaviour.
 
 ## The Python surface
 
@@ -76,24 +72,25 @@ compiler.
 ```python
 import uniaccurate
 
-uniaccurate.fibonacci(10)   # 55
-uniaccurate.version()       # '0.1.0'
+uniaccurate.two_sum(1.0, 2e16)   # (2e16, 1.0) — error recovered
+uniaccurate.version()            # '0.0.1'
 ```
 
-Here the domain check returns, because Python has exceptions to carry it:
-`fibonacci(-1)` and `fibonacci(93)` raise `ValueError`, a non-`int` argument
-raises `TypeError`. Each surface expresses one contract in the terms its own
-callers expect — a precondition in Nim, a clamp in C, an exception in Python.
+Here the input check returns, because Python has exceptions to carry it: a
+non-numeric argument raises `TypeError`. Each surface expresses one contract
+in the terms its own callers expect — a precondition in Nim, a defined
+fallback in C, an exception in Python.
 
-`py/notebooks/quickstart.ipynb` runs these calls against an installed wheel and
-renders on GitHub directly.
+`py/notebooks/quickstart.ipynb` runs these calls against an installed wheel
+and renders on GitHub directly.
 
-## Cloning this into an engine
+## References
 
-Rename the tokens (`UniAccurate` → `UniFoo`, `uniaccurate` → `unifoo`, `ut_` →
-the engine's prefix), replace `fibonacci.nim` with the domain modules, then
-rewrite this book for the domain. The generated reference lists the API; the
-book is where the domain gets explained.
+The EFT identities, their exactness conditions, and the FMA contraction
+invariant are documented in `src/UniAccurate/twosum.nim` with full citations
+(Dekker 1971; Møller 1965; Knuth 1998; Ogita, Rump & Oishi 2005; Boldo &
+Melquiond 2008; Shewchuk 1997; Goldberg 1991). The generated API reference
+lists the symbols; this book is where the layer gets explained.
 """
 
 nbSave
