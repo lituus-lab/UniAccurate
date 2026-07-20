@@ -73,7 +73,7 @@ compiler.
 import uniaccurate
 
 uniaccurate.two_sum(1.0, 2e16)   # (2e16, 1.0) — error recovered
-uniaccurate.version()            # '0.0.1'
+uniaccurate.version()            # '0.1.0'
 ```
 
 Here the input check returns, because Python has exceptions to carry it: a

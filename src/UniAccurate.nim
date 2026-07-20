@@ -2,4 +2,4 @@
 import UniAccurate/twosum
 export twosum
 
-const UniAccurateVersion* = "0.0.1"
+const UniAccurateVersion* = "0.1.0"

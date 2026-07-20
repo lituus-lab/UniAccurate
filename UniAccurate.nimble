@@ -1,6 +1,6 @@
 # UniAccurate — error-free transforms and accurate summation/dot-product.
 
-version       = "0.0.1"
+version       = "0.1.0"
 author        = "lituus-lab"
 description   = "Error-free transforms and accurate summation/dot-product (Nim + C-ABI + Python)"
 license       = "Apache-2.0"

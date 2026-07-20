@@ -2,7 +2,7 @@
 ## Keep in sync with include/UniAccurate.h; tests/c links the header against this lib.
 import ../UniAccurate
 
-const UniAccurateVersionC: cstring = "0.0.1"
+const UniAccurateVersionC: cstring = "0.1.0"
 
 # Unmangled C symbols, C calling convention, exported from the shared lib.
 {.push exportc, cdecl, dynlib.}
