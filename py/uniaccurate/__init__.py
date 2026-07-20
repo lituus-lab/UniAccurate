@@ -21,4 +21,4 @@ def version():
     return _version_c().decode("ascii")
 
 
-__all__ = ["two_sum", "version", "__version__"]
+__all__ = ["__version__", "two_sum", "version"]

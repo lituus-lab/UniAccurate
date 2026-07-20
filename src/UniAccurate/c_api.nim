@@ -7,7 +7,7 @@ const UniAccurateVersionC: cstring = "0.1.0"
 # Unmangled C symbols, C calling convention, exported from the shared lib.
 {.push exportc, cdecl, dynlib.}
 
-proc ua_two_sum(a, b: cdouble; s, e: ptr cdouble) =
+proc ua_two_sum(a, b: cdouble; s, e: ptr cdouble) {.raises: [].} =
   ## Error-free sum: writes `*s = fl(a+b)` and `*e` with `a + b = *s + *e`
   ## exactly in real arithmetic (Møller–Knuth TwoSum). For non-finite `a` or
   ## `b`, `*s = a + b` (IEEE) and `*e = NaN`. Never raises. Null `s` or `e` is

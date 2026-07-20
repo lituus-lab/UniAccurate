@@ -25,8 +25,11 @@ proc randomF64(r: var uint64): float64 =
   cast[float64](bits)
 
 proc p2(e: int): float64 =
-  ## Exact `2^e` for `e` in [-1022, 1023] via direct bit construction.
-  cast[float64](uint64(e + 1023) shl 52)
+  ## Exact `2^e` for `e` in [-1074, 1023] (covers subnormals and normals).
+  if e >= -1022:
+    cast[float64](uint64(e + 1023) shl 52)
+  else:
+    cast[float64](1'u64 shl (e + 1074)) # subnormal
 
 proc p2f(e: int): float32 =
   ## Exact `2^e` for `e` in [-126, 127] (float32).
@@ -154,8 +157,8 @@ suite "twoProduct":
     check e == 0.0
 
   test "subnormal product is allowed when nonzero (float64)":
-    let (p, e) = twoProductFMA(p2(-500), p2(-500))                 # 2^-1000
-    check p == p2(-1000)
+    let (p, e) = twoProductFMA(p2(-525), p2(-525)) # 2^-1050 (subnormal)
+    check p == p2(-1050)
     check e == 0.0
 
   when not defined(release) and not defined(danger):
