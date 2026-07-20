@@ -55,7 +55,7 @@ nbText: """
 
 The EFT layer recovers the per-operation error; summation algorithms trade
 cost for how much that error accumulates over `n` additions. Three variants,
-in order of increasing accuracy:
+ordered by worst-case rounding depth (deepest first):
 
 - `naiveSum` — left-to-right; `n - 1` additions, error `O(n)`.
 - `pairwiseSum` — recursive divide-and-conquer with a naive base case of
@@ -85,9 +85,11 @@ nbCode:
 
 nbText: """
 All three return `55.0` here — integer-valued data sums exactly at every
-precision. The difference shows on data that rounds: pairwise and iterative
-lose far less of the small addends, because they add values of comparable
-magnitude before folding them into the running total.
+precision. On data that rounds, the worst case is far gentler for pairwise and
+iterative: the rounding depth is logarithmic rather than linear, so fewer
+roundings touch a small addend on its way to the total. A specific input is
+not guaranteed to come out closer to the exact sum — the per-instance order
+depends on the data — but the worst-case bound is.
 
 **Limitation.** Every variant propagates NaN/Inf and can yield `NaN` from
 opposite-sign overflow (`+Inf + -Inf = NaN`, IEEE-754), at a merge node as
