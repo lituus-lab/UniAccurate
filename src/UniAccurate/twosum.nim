@@ -127,6 +127,35 @@ func ulp*[T: SomeFloat](x: T): T {.inline.} =
       u = 1'u32 shl (expField - 1)
     result = cast[T](u)
 
+func isFin*(x: SomeFloat): bool {.inline.} =
+  ## Finite: normal, subnormal, or zero — excludes NaN and ±Inf. The guard the
+  ## EFT precondition rests on: a compensated algorithm that meets a non-finite
+  ## operand or partial sum diverts that step to a plain IEEE `+`, so NaN/Inf
+  ## propagate as a naive sum would and finite inputs never raise.
+  runnableExamples:
+    doAssert isFin(1.0)
+    doAssert isFin(0.0)
+    doAssert isFin(5e-324) # smallest subnormal
+    doAssert not isFin(NaN)
+    doAssert not isFin(Inf)
+    doAssert not isFin(-Inf)
+  classify(x) notin {fcNan, fcInf, fcNegInf}
+
+func allFin*[T: SomeFloat](x: openArray[T]): bool {.inline.} =
+  ## True iff every element of `x` is finite (`isFin`). The finite-input safety
+  ## postcondition of the compensated sums: when `allFin(x)` holds the result is
+  ## never NaN (overflow may yield ±Inf, but a single-sign one — the per-step
+  ## `isFin` guard keeps an `Inf − Inf = NaN` from ever being evaluated).
+  runnableExamples:
+    doAssert allFin([1.0, 2.0, 3.0])
+    doAssert not allFin([1.0, NaN, 2.0])
+    doAssert not allFin([1.0, Inf])
+    doAssert allFin(newSeq[float64](0))
+  for v in x:
+    if not isFin(v):
+      return false
+  true
+
 func split*[T: SomeFloat](a: T): (T, T) {.contractual, inline.} =
   ## Veltkamp's splitting (Dekker 1971): decompose `a` into `(hi, lo)` with
   ## `a = hi + lo` exactly, `hi` and `lo` bit-disjoint, each holding at most
