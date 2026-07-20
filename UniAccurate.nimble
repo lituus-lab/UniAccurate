@@ -34,17 +34,24 @@ task docs, "API reference + book into pages/ — what CI publishes":
 task eft, "EFT tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_eft tests/test_eft.nim"
 
+task sum, "Summation tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_sum tests/test_naivesum.nim"
+
 task test, "Nim tests (debug, contracts active)":
   exec "nimble eft"
+  exec "nimble sum"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_sum_rel tests/test_naivesum.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
   exec "nimble eft"
+  exec "nimble sum"
 
 task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_eft_rel tests/test_eft.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_sum_rel tests/test_naivesum.nim"
 
 task testAll, "debug + release + C ABI":
   exec "nimble test"
