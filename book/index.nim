@@ -115,6 +115,77 @@ not overflow stay finite.
 """
 
 nbText: """
+## Compensated summation
+
+Pairwise shrinks the *worst-case* rounding depth; compensation shrinks the
+*per-step* error itself. Each addition's rounding error is recovered by an
+error-free transform and fed back into the sum, so the forward error's
+*leading-order* term no longer grows with `n` (the residual `O(nε²)` still
+accumulates):
+
+- `kahanSum` — Kahan's single-compensation scheme, 4 FLOPs/term.
+- `neumaierSum` — Kahan-Babuška-Neumaier, the magnitude-robust variant, 7
+  FLOPs/term (built on `twoSum`).
+- `kleinSum` — Klein's two-level scheme, ~13 FLOPs/term, ~ε² accuracy.
+
+With `ε` the machine epsilon (`2^-52` for float64), the forward bounds (first
+order) are
+
+    kahanSum / neumaierSum:  (2ε + O(nε²)) · Σ|xᵢ|
+    kleinSum:                O(ε²) · Σ|xᵢ|
+
+so compensation trades a few extra FLOPs per term for a leading-order error
+independent of `n` (the `O(nε²)` tail still grows, but dominates only for huge
+`n·ε`). The bound is in `Σ|xᵢ|` (the input magnitude), not `|S|`:
+cancellation (`Σ|xᵢ| >> |S|`) still grows the *relative* error — compensation
+bounds the absolute error, the best attainable without sorting.
+"""
+
+nbCode:
+  let ys = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+  echo "naiveSum    = ", naiveSum(ys)
+  echo "kahanSum    = ", kahanSum(ys)
+  echo "neumaierSum = ", neumaierSum(ys)
+  echo "kleinSum    = ", kleinSum(ys)
+  # Kahan loses a small addend dominated by the running sum; Neumaier/Klein
+  # recover it. The exact sum is 2.0.
+  let mag = [1.0, 1e100, 1.0, -1e100]
+  echo "kahanSum    (magnitude) = ", kahanSum(mag)
+  echo "neumaierSum (magnitude) = ", neumaierSum(mag)
+  echo "kleinSum    (magnitude) = ", kleinSum(mag)
+
+nbText: """
+On `0.1·10` the naive sum drops the last bit (`0.9999999999999999`); all three
+compensated sums recover `1.0`. On the magnitude case the exact sum is `2.0`:
+`kahanSum` loses the small `1`s (they fall below the ulp of `1e100`), while
+`neumaierSum` and `kleinSum` recover `2.0` — the branchless `twoSum` handles
+both operand orderings, which is the magnitude-robustness fix.
+
+The same three functions cross the other surfaces: the C ABI exposes
+`ua_sum_kahan`, `ua_sum_neumaier`, `ua_sum_klein`, and Python exposes
+`kahan_sum`, `neumaier_sum`, `klein_sum`.
+
+**Limitation.** As with the pairwise sums, every variant propagates NaN/Inf and
+can yield `NaN` from opposite-sign overflow (`+Inf + -Inf = NaN`). The per-step
+`isFin` guard keeps an `Inf − Inf` from ever being evaluated on finite input,
+so finite inputs never yield NaN (overflow gives a single-sign ±Inf); an exact
+superaccumulator path is deferred to a later algorithm.
+
+### References
+
+- Kahan, W. (1965). "Pracniques: Further Remarks on Reducing Truncation
+  Errors". *Comm. ACM* 8(1), 40. doi:10.1145/363707.363723
+- Babuška, I. (1969). "Numerical Stability in Mathematical Analysis". *Proc.
+  IFIP Congress 1968*, pp. 11–23. North-Holland.
+- Neumaier, A. (1974). "Rundungsfehleranalyse einiger Verfahren zur Summation
+  endlicher Summen". *ZAMM* 54(1), 39–51. doi:10.1002/zamm.19740540106
+- Klein, A. (2006). "A Generalized Kahan-Babuška-Summation-Algorithm".
+  *Computing* 76(3-4), 279–293. doi:10.1007/s00607-005-0139-x
+- Higham, N.J. (1993). "The Accuracy of Floating Point Summation". *SIAM J.
+  Sci. Comput.* 14(4), 783–799. doi:10.1137/0914050
+"""
+
+nbText: """
 ## The C ABI
 
 The same entry point, reachable from anything that speaks C. The header is
