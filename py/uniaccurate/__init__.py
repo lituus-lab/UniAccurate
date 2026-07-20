@@ -41,7 +41,7 @@ def naive_sum(values):
     """Naive (sequential) sum. Empty input is 0.0. NaN/Inf propagate.
     Raises TypeError on non-numeric elements.
     """
-    return _sum_naive_c(_validate(list(values)))
+    return _sum_naive_c(_validate(values))
 
 
 def pairwise_sum(values):
@@ -49,14 +49,14 @@ def pairwise_sum(values):
     opposite-sign overflow can yield NaN (no fallback). Raises TypeError on
     non-numeric elements.
     """
-    return _sum_pairwise_c(_validate(list(values)))
+    return _sum_pairwise_c(_validate(values))
 
 
 def pairwise_sum_iterative(values):
     """Iterative (bottom-up) pairwise sum. Empty input is 0.0. NaN/Inf
     propagate. Raises TypeError on non-numeric elements.
     """
-    return _sum_pairwise_iterative_c(_validate(list(values)))
+    return _sum_pairwise_iterative_c(_validate(values))
 
 
 def version():
@@ -66,9 +66,9 @@ def version():
 
 __all__ = [
     "__version__",
-    "two_sum",
     "naive_sum",
     "pairwise_sum",
     "pairwise_sum_iterative",
+    "two_sum",
     "version",
 ]
