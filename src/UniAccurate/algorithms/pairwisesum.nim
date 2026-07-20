@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-## Pairwise (recursive) summation.
+## Pairwise summation (recursive and iterative).
 ##
 ## Splits `x` into two halves, sums each recursively, and adds the partial
 ## sums. The recursion bottoms out in a naive block sum of at most
@@ -58,3 +58,39 @@ func pairwiseSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     if x.len == 0:
       return T(0)
     result = pairwise(x, 0, x.high)
+
+func pairwiseSumIterative*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+  ## Bottom-up pairwise sum: combine adjacent pairs level by level into a
+  ## single value, with no recursion. The reduction tree has depth
+  ## `ceil(log2(n))` — every element ascends at most `ceil(log2(n))` rounding
+  ## steps — so the worst-case forward error is
+  ##
+  ##     |fl(sum) - S| <= ceil(log2(n)) * u * Σ|x_i|   (first order; O(u^2))
+  ##
+  ## the tightest pairwise bound, without the `(b - 1)` base-case depth of the
+  ## recursive variant (`pairwiseSum`). The tradeoff is an `O(n)` working
+  ## buffer versus the recursive form's `O(log n)` call stack. Higham (1993).
+  ## Empty input is `0`; NaN/Inf propagate as in the recursive form (the
+  ## opposite-sign overflow artifact `+Inf + -Inf = NaN` can arise at any
+  ## merge node; no fallback is applied).
+  ensure:
+    x.len != 0 or result == T(0)
+  body:
+    result = T(0)
+    if x.len == 0:
+      return
+    if x.len == 1:
+      result = x[0]
+      return
+    var buf = newSeq[T](x.len)
+    for i in 0 ..< x.len:
+      buf[i] = x[i]
+    var n = buf.len
+    while n > 1:
+      let pairs = n div 2
+      for j in 0 ..< pairs:
+        buf[j] = buf[2 * j] + buf[2 * j + 1]
+      if (n and 1) == 1: # odd tail carries up one level unchanged
+        buf[pairs] = buf[n - 1]
+      n = (n + 1) div 2
+    result = buf[0]

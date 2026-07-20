@@ -64,3 +64,39 @@ suite "pairwiseSum":
     for _ in 0 ..< 128:
       x.add -1e308
     check classify(pairwiseSum(x)) == fcNan
+
+suite "pairwiseSumIterative":
+  test "empty and single":
+    check pairwiseSumIterative(newSeq[float64](0)) == 0.0
+    check pairwiseSumIterative([1.0]) == 1.0
+    check pairwiseSumIterative([1.0'f32]) == 1.0'f32
+
+  test "small exact sums":
+    check pairwiseSumIterative([1.0, 2.0]) == 3.0
+    check pairwiseSumIterative([1.0, 2.0, 3.0, 4.0]) == 10.0
+    check pairwiseSumIterative([1.0'f32, 2.0'f32, 3.0'f32]) == 6.0'f32
+
+  test "integer sums are exact across the reduction":
+    for n in [2, 3, 64, 128, 129, 200, 256, 257, 1000]:
+      var x: seq[float64] = @[]
+      for i in 1 .. n:
+        x.add float64(i)
+      check pairwiseSumIterative(x) == iotaSumF64(n)
+
+  test "matches pairwiseSum and naiveSum for exactly representable sums":
+    var x: seq[float64] = @[]
+    for i in 1 .. 300:
+      x.add float64(i)
+    check pairwiseSumIterative(x) == pairwiseSum(x) # both exact for integers
+    check pairwiseSumIterative(x) == naiveSum(x)
+
+  test "finite input stays finite":
+    var x: seq[float64] = @[]
+    for i in 0 ..< 500:
+      x.add float64(i) * 0.1 + float64(i mod 17)
+    check classify(pairwiseSumIterative(x)) in {fcNormal, fcZero, fcNegZero}
+
+  test "non-finite propagates":
+    check classify(pairwiseSumIterative([1.0, NaN, 2.0])) == fcNan
+    check classify(pairwiseSumIterative([1.0, Inf])) == fcInf
+    check classify(pairwiseSumIterative([1.0, Inf, -Inf])) == fcNan
