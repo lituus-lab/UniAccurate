@@ -73,7 +73,8 @@ import contracts
 const
   SplitFactor64* = 134217729.0
     ## Veltkamp split factor for float64: `2^27 + 1`. Splits a 53-bit
-    ## significand into two non-overlapping 26-bit parts. Dekker (1971).
+    ## significand into two non-overlapping parts (26 high, 27 low bits).
+    ## Dekker (1971).
   SplitFactor32* = 4097.0'f32
     ## Veltkamp split factor for float32: `2^12 + 1`. Splits a 24-bit
     ## significand into two non-overlapping 12-bit parts. Must be a float32 so
@@ -175,7 +176,7 @@ func twoSum*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
   ## ordering. Returns `(s, e)` with `a + b = s + e` exactly, `s = fl(a+b)`,
   ## `|e| <= ½ ulp(s)` for normal `s` (1 ulp subnormal). 6 FLOPs, branchless.
   ##
-  ## Møller (1965); Knuth (1998) TAOCP 2, Theorem C.
+  ## Møller (1965); Knuth (1998) TAOCP 2, §4.2.2, Theorem B.
   require:
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
@@ -262,8 +263,8 @@ func twoProduct*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
 # hardware FMA unit — without one, libm emulates it (correct, slower). The
 # guard selects the FMA path on platforms with a cheap libm FMA (amd64/arm64)
 # or an explicit `useFMA` override; other targets fall back to the 17-FLOP
-# `twoProduct`. Both are exact. Ogita, Rump, Oishi (2005) §4.2; Boldo &
-# Melquiond (2008).
+# `twoProduct`. Both are exact. Ogita, Rump, Oishi (2005) §3, Algorithm 3.5;
+# Boldo & Melquiond (2008).
 
 when defined(useFMA) or defined(amd64) or defined(arm64):
 
