@@ -70,28 +70,32 @@ double ua_dot_exact(const double *x, const double *y, size_t n);
 /* ORO sum2 (Alg 4.1) — the magnitude-robust compensated sum, value-identical to
  * ua_sum_neumaier. Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate;
  * finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
- * Single-threaded, reentrant. Null x with n > 0 is undefined. */
+ * Single-threaded, reentrant. Null x with n > 0 is undefined. No SIMD kernel —
+ * scalar under -d:simd (ADR-0007). */
 double ua_sum_oro(const double *x, size_t n);
 
 /* Rump NearSum (Alg 7.4) — the correctly-rounded sum, the round-to-nearest of
  * the exact real sum bit-for-bit. Empty input (n == 0, x may be NULL) is 0.
  * NaN/Inf propagate (non-finite input or a sigma0 overflow falls back to the
  * exact superaccumulator); finite inputs never yield NaN (overflow ⇒ ±Inf).
- * Never raises. Single-threaded, reentrant. Null x with n > 0 is undefined. */
+ * Never raises. Single-threaded, reentrant. Null x with n > 0 is undefined. No
+ * SIMD kernel — scalar under -d:simd (ADR-0007). */
 double ua_sum_near(const double *x, size_t n);
 
 /* Rump AccSum (Alg 4.5) — a faithful rounding of the exact sum (within 1 ulp).
  * Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate (non-finite input
  * or a sigma0 overflow falls back to the exact superaccumulator); finite inputs
  * never yield NaN (overflow ⇒ ±Inf). Never raises. Single-threaded, reentrant.
- * Null x with n > 0 is undefined. */
+ * Null x with n > 0 is undefined. No SIMD kernel — scalar under -d:simd
+ * (ADR-0007). */
 double ua_sum_acc(const double *x, size_t n);
 
 /* ORO SumK (Alg 4.8) — K-fold cascaded compensated sum: K=1 naive, K=2
  * first-order compensated (≈ ua_sum_neumaier), K=3 second-order (≈ ua_sum_klein);
  * k < 1 is treated as 1. Empty input (n == 0, x may be NULL) is 0. NaN/Inf
  * propagate; finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
- * Single-threaded, reentrant. Null x with n > 0 is undefined. */
+ * Single-threaded, reentrant. Null x with n > 0 is undefined. No SIMD kernel —
+ * scalar under -d:simd (ADR-0007). */
 double ua_sum_k(const double *x, size_t n, int k);
 
 /* Condition number of the sum, cond = Σ|xᵢ| / |Σxᵢ|: 1 for a no-cancellation
