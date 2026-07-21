@@ -138,10 +138,12 @@ def _sum_k_c(list values, int k):
 cdef _dot_raw(list xs, list ys, double (*fn)(const double *, const double *, size_t)):
     """Copy `xs`/`ys` into malloc'd double buffers, call `fn`, free in finally."""
     cdef Py_ssize_t n = len(xs)
-    if n == 0:
-        return 0.0
+    # Validate the length before the empty early return: an empty `xs` paired
+    # with a non-empty `ys` is a mismatch, not the empty dot (which is 0.0).
     if len(ys) != n:
         raise ValueError("dot product requires equal-length inputs")
+    if n == 0:
+        return 0.0
     cdef double *bx = <double *>malloc(n * sizeof(double))
     cdef double *by = <double *>malloc(n * sizeof(double))
     if bx == NULL or by == NULL:
@@ -175,10 +177,12 @@ cdef _dot_k_raw(list xs, list ys, int k,
                 double (*fn)(const double *, const double *, size_t, int)):
     """Copy `xs`/`ys` into malloc'd double buffers, call `fn(buf, buf, n, k)`, free."""
     cdef Py_ssize_t n = len(xs)
-    if n == 0:
-        return 0.0
+    # Validate the length before the empty early return: an empty `xs` paired
+    # with a non-empty `ys` is a mismatch, not the empty dot (which is 0.0).
     if len(ys) != n:
         raise ValueError("dot product requires equal-length inputs")
+    if n == 0:
+        return 0.0
     cdef double *bx = <double *>malloc(n * sizeof(double))
     cdef double *by = <double *>malloc(n * sizeof(double))
     if bx == NULL or by == NULL:

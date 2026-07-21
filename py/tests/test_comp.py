@@ -219,6 +219,9 @@ def test_dot_non_numeric_raises(name, fn):
 def test_dot_mismatched_length_raises(name, fn):
     with pytest.raises(ValueError):
         fn([1.0, 2.0, 3.0], [1.0, 2.0])
+    # Empty `xs` with a non-empty `ys` is a length mismatch, not the empty dot.
+    with pytest.raises(ValueError):
+        fn([], [1.0])
 
 
 @pytest.mark.parametrize("name,fn", DOTS)
