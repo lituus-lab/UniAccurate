@@ -375,9 +375,10 @@ The dot product `xᵀy = Σ xᵢ·yᵢ` is the natural analogue of summation: ea
 product is split by an error-free transform (`twoProductFMA` → `(h, r₁)` with
 `h + r₁ = xᵢ·yᵢ` exactly), and the per-term rounding errors — the product
 error `r₁` and the sum error `r₂` from `twoSum` — are themselves accumulated
-with a compensated sum. The forward error then shrinks to
-`O(u^K · cond(xᵀy) · |xᵀy|)`, as if the dot were computed in *K-fold* working
-precision (twice for `K = 2`), provided `(n−1)u < 1`:
+with a compensated sum. The total error is a final rounding of the result plus
+a K-fold compensated remainder in the magnitude `E` — `O(u·|xᵀy| + u^K · E)` —
+as if the dot were computed in *K-fold* working precision (twice for `K = 2`),
+provided `(n−1)u < 1`:
 
     naiveDot: γ_{2n}(u) · E            left-to-right, two roundings per term
     dot2:     2u·|xᵀy| + 2·γ²_{n+1}(2u)·E   twice precision (Graillat Dot2FMA)
