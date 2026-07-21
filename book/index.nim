@@ -246,16 +246,20 @@ algorithm (documented in ADR-0007).
 nbText: """
 ## Exact summation (the small superaccumulator)
 
-`shewchuckSum` rounds once, but its expansion is still float-precision: an
-addend too small to land in any expansion slot is lost. `superSum` drops that
-ceiling by accumulating in an *exact integer* superaccumulator (Neal's small
-superaccumulator): each addend is split into its exponent chunk and added into
-a fixed array of `int64` bins covering the whole float range, carries deferred
-lazily, and a single final round produces the float result. The integer sum is
-exact, commutative, and associative, so the final rounding is order-invariant
-and the error is again `½ ulp(fl(Σ xᵢ))` — but now no addend is ever lost to
-the working precision, and opposite-sign overflow cancels exactly instead of
-yielding `+Inf + −Inf = NaN`.
+`shewchuckSum` is already correctly rounded — `½ ulp(fl(Σ xᵢ))` — holding the
+sum as a float-precision expansion whose `twoSum` merge collects every bit
+without rounding loss. Its one ceiling is the float range itself: an
+intermediate partial that overflows (the running magnitude exceeds the float
+range, even when the exact sum is finite) abandons the expansion and falls back
+to IEEE propagation, where opposite-sign overflow can yield `+Inf + −Inf = NaN`.
+`superSum` drops that ceiling by accumulating in an *exact integer*
+superaccumulator (Neal's small superaccumulator): each addend is split into its
+exponent chunk and added into a fixed array of `int64` bins covering the whole
+float range, carries deferred lazily, and a single final round produces the
+float result. The integer sum is exact, commutative, and associative, so the
+final rounding is order-invariant and the error is again `½ ulp(fl(Σ xᵢ))` —
+but now the accumulator holds the true magnitude across the whole range, and
+opposite-sign overflow cancels exactly instead of yielding `+Inf + −Inf = NaN`.
 
 `superDot` reuses the same accumulator with a 64×64→128 product step, so the
 dot product `Σ xᵢyᵢ` is held at its true magnitude even when an individual
