@@ -34,7 +34,8 @@ proc ua_sum_naive(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template s: untyped = toOpenArray(arr, 0, last)
   when defined(simd):
     when simdF64Enabled:
       naiveSumSimd(s)
@@ -50,7 +51,8 @@ proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template s: untyped = toOpenArray(arr, 0, last)
   when defined(simd):
     when simdF64Enabled:
       pairwiseSumSimd(s)
@@ -65,7 +67,8 @@ proc ua_sum_pairwise_iterative(x: ptr cdouble; n: csize_t): cdouble {.raises: []
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  pairwiseSumIterative(toOpenArray(arr, 0, int(n) - 1))
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  pairwiseSumIterative(toOpenArray(arr, 0, last))
 
 proc ua_sum_kahan(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Kahan compensated sum of `n` doubles at `x`. Empty input is `0`. Never
@@ -74,7 +77,8 @@ proc ua_sum_kahan(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template s: untyped = toOpenArray(arr, 0, last)
   when defined(simd):
     when simdF64Enabled:
       let (r, reliable) = kahanSumSimd(s)
@@ -91,7 +95,8 @@ proc ua_sum_neumaier(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template s: untyped = toOpenArray(arr, 0, last)
   when defined(simd):
     when simdF64Enabled:
       let (r, reliable) = neumaierSumSimd(s)
@@ -108,7 +113,8 @@ proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
-  template s: untyped = toOpenArray(arr, 0, int(n) - 1)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template s: untyped = toOpenArray(arr, 0, last)
   when defined(simd):
     when simdF64Enabled:
       let (r, reliable) = kleinSumSimd(s)
