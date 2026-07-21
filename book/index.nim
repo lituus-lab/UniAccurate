@@ -186,6 +186,60 @@ superaccumulator path is deferred to a later algorithm.
 """
 
 nbText: """
+## Correctly-rounded summation
+
+Compensation drives the *leading-order* error to zero; `shewchukSum` drives
+the *entire* error to a single rounding. It accumulates each addend into a
+non-overlapping, magnitude-ascending expansion with `twoSum`, then collapses
+that expansion once under round-to-nearest-even — the exact real sum `Σ xᵢ`
+rounded to the working precision. This is the strongest accuracy a
+fixed-precision sum can offer: the result equals Python's `math.fsum`
+bit-for-bit on float64. `fsum` is an alias.
+
+The forward bound is the round-to-nearest bound itself, half a unit in the last
+place of the rounded result:
+
+    shewchukSum:  ½ ulp(fl(Σ xᵢ))
+
+so the error is bounded in `|S|`, not `Σ|xᵢ|`: cancellation does not grow it.
+Correct rounding holds only while every partial stays finite; a non-finite
+addend or an intermediate overflow abandons the exact expansion and falls back
+to a naive IEEE sum (NaN/±Inf propagate; finite inputs never yield NaN).
+"""
+
+nbCode:
+  let zs = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+  echo "naiveSum     = ", naiveSum(zs)
+  echo "shewchukSum = ", shewchukSum(zs)
+  echo "fsum         = ", fsum(zs)
+  let cancel = [1.0, 1e100, 1.0, -1e100]
+  echo "shewchukSum (magnitude) = ", shewchukSum(cancel)
+
+nbText: """
+On `0.1·10` the naive sum drops the last bit (`0.9999999999999999`);
+`shewchukSum` returns `1.0` — the exact `1.0` rounded once, not a compensated
+approximation. On the magnitude case the exact sum is `2.0`, recovered exactly
+where `kahanSum` lost it.
+
+The C ABI exposes `ua_sum_shewchuk` and Python exposes `shewchuk_sum` (and
+`fsum` is Nim-only). There is no SIMD kernel: the sequential expansion does not
+vectorize, so under `-d:simd` the C ABI dispatches this symbol to the scalar
+algorithm (documented in ADR-0007).
+
+### References
+
+- Shewchuk, J.R. (1997). "Adaptive Precision Floating-Point Arithmetic and
+  Fast Robust Geometric Predicates". *Discrete & Computational Geometry*
+  18(3), 305–363. doi:10.1007/PL00009321 — the expansion arithmetic.
+- Hettinger, R. (2005). `math.fsum` (ASPN Cookbook recipe 393090), adopted by
+  CPython — the round-half-to-even collapse and magnitude-ascending merge over
+  Shewchuk's expansion.
+- Goldberg, D. (1991). "What Every Computer Scientist Should Know about
+  Floating-Point Arithmetic". *ACM Comput. Surv.* 23(1), 5–48.
+  doi:10.1145/103162.103163
+"""
+
+nbText: """
 ## The C ABI
 
 The same entry point, reachable from anything that speaks C. The header is
