@@ -196,127 +196,114 @@ func nextPowerTwo*[T: SomeFloat](p: T): T =
     return cast[float32](uint32(exp + 1) shl 23)
 
 func nextFloat[T: SomeFloat](x: T): T =
-  ## The next representable float strictly greater than `x` (toward +Inf).
+  ## The next representable float strictly greater than `x` (toward +Inf). For
+  ## `x >= 0` the bit pattern increases; for `x < 0` it decreases (negative
+  ## magnitudes grow as the bits grow, so toward +Inf is the other way). `-0`
+  ## maps to the smallest positive subnormal. Assumes finite `x`.
   when T is float64:
     let b = cast[uint64](x)
     if b == 0x8000_0000_0000_0000'u64: # -0.0 -> smallest positive subnormal
       return cast[float64](1'u64)
-    return cast[float64](b + 1'u64)
+    if b shr 63 == 1: # negative: toward +Inf is a bit decrement
+      return cast[float64](b - 1'u64)
+    return cast[float64](b + 1'u64) # non-negative (incl. +0): toward +Inf is a bit increment
   else:
     let b = cast[uint32](x)
     if b == 0x8000_0000'u32:
       return cast[float32](1'u32)
+    if b shr 31 == 1:
+      return cast[float32](b - 1'u32)
     return cast[float32](b + 1'u32)
 
 func prevFloat[T: SomeFloat](x: T): T =
-  ## The previous representable float strictly less than `x` (toward -Inf).
+  ## The previous representable float strictly less than `x` (toward -Inf). For
+  ## `x > 0` the bit pattern decreases; for `x <= 0` it increases (the negative
+  ## direction). Both zeros map to the smallest negative subnormal (a bit
+  ## decrement of `+0` would cross into the NaN bit patterns). Assumes finite `x`.
   when T is float64:
     let b = cast[uint64](x)
-    # Both zeros round to the smallest negative subnormal (bit decrement would
-    # cross the sign boundary into a signalling-NaN bit pattern).
-    if b == 0'u64 or b == 0x8000_0000_0000_0000'u64:
+    if b == 0'u64: # +0.0 -> smallest negative subnormal
       return cast[float64](0x8000_0000_0000_0001'u64)
-    return cast[float64](b - 1'u64)
+    if b shr 63 == 1: # negative (incl. -0): toward -Inf is a bit increment
+      return cast[float64](b + 1'u64)
+    return cast[float64](b - 1'u64) # positive: toward -Inf is a bit decrement
   else:
     let b = cast[uint32](x)
-    if b == 0'u32 or b == 0x8000_0000'u32:
+    if b == 0'u32:
       return cast[float32](0x8000_0001'u32)
+    if b shr 31 == 1:
+      return cast[float32](b + 1'u32)
     return cast[float32](b - 1'u32)
 
-func extractVector[T: SomeFloat](sigma: T, pCur, pNext: var seq[T]): T =
-  ## Rump `ExtractVector` (Part I, Alg 3.4): with `sigma` a power of two `>=
-  ## 2^M·max|p_i|`, splits each `p_i` into a high part `q_i` (absorbed into the
-  ## returned `tau`) and a residual `p'_i = p_i - q_i` written into `pNext`, so
-  ## `p_i = q_i + p'_i` exactly and `sum(p) = tau + sum(pNext)`. `pNext` is
-  ## pre-allocated by the caller with `pCur.len` slots and overwritten in place.
+func extractVector[T: SomeFloat](sigma: T, p: var seq[T]): T =
+  ## Rump `ExtractVector` (Part I, Alg 3.4), in place. With `sigma` a power of
+  ## two `>= 2^M·max|p_i|`, splits each `p_i` into a high part `q_i` (absorbed
+  ## into the returned `tau`) and a residual written back into `p_i`, so
+  ## `p_i = q_i + p'_i` exactly and `sum(p) = tau + sum(p)` after the call.
   result = T(0)
-  for i in 0 ..< pCur.len:
-    let qi = (sigma + pCur[i]) - sigma
-    pNext[i] = pCur[i] - qi
+  for i in 0 ..< p.len:
+    let qi = (sigma + p[i]) - sigma
+    p[i] = p[i] - qi
     result = result + qi
 
-func rumpTransform[T: SomeFloat](p: openArray[T],
-    pPrime: var seq[T]): tuple[tau1: T, tau2: T] =
-  ## Rump `Transform` (Part I, Alg 4.1/4.4): the faithful error-free transform.
-  ## Produces `(tau1, tau2)` (a `FastTwoSum` split of the high-order sum) and,
-  ## through `pPrime`, a residual vector with `sum(p) = tau1 + tau2 + sum(pPrime)`
-  ## exactly in real arithmetic, `max|pPrime| <= eps·sigma`. `M = ceil(log2(n+2))`;
-  ## `eps` is the machine epsilon. The repeat-until shrinks `sigma` by
-  ## `2^M·eps` until the accumulated high part `t` dominates the residual.
+func rumpTransform[T: SomeFloat](p: var seq[T],
+    offset: T): tuple[tau1: T, tau2: T] =
+  ## Rump `Transform` (Part I, Alg 3.3/4.4) with `offset`, in place. The
+  ## error-free `ExtractVector` peels the leading bits of `sum(p) + offset` into
+  ## the accumulator `t` (seeded with `offset`, so the offset is never itself
+  ## extracted — Lemma 7.3's precondition `offset ∈ eps·sigma0·Z`); `sigma`
+  ## shrinks by `2^M·eps` each pass until `|t|` carries the sum down to the
+  ## residual scale or `sigma` reaches the underflow floor. A final
+  ## `FastTwoSum(t^{m-1}, tau^m)` — exact at the stop, where `|t^{m-1}| >=
+  ## |tau^m|` (Rump Lemma 3.4) — recovers the last fold's rounding. `p` is
+  ## overwritten with the residual `p'`; the result is `(tau1, tau2)` with
+  ## `sum(p) + offset = tau1 + tau2 + sum(p')` exactly. Returns `(Inf, 0)` when
+  ## the initial extraction unit `sigma0` overflows (the caller falls back).
   let n = p.len
   if n == 0:
-    pPrime = newSeq[T](0)
-    return (T(0), T(0))
+    return (offset, T(0))
   var mu = T(0)
   for v in p:
     let a = abs(v)
     if a > mu:
       mu = a
   if mu == T(0):
-    pPrime = newSeq[T](n)
-    return (T(0), T(0))
+    return (offset, T(0)) # all-zero vector: the sum is just the offset
   when T is float64:
-    const eps = cast[float64](0x3CB0_0000_0000_0000'u64) # 2^-52 (machine epsilon)
+    const eps = cast[float64](0x3CA0_0000_0000_0000'u64) # 2^-53 (unit roundoff)
     const eta = cast[float64](1'u64) # 2^-1074 (smallest subnormal)
   else:
-    const eps = cast[float32](0x3400_0000'u32) # 2^-23
+    const eps = cast[float32](0x3380_0000'u32) # 2^-24 (unit roundoff)
     const eta = cast[float32](1'u32) # 2^-149
   let m = ceilLog2(n + 2) # M = ceil(log2(n+2))
   let sigma0 = nextPowerTwo(mu) * pow2i[T](m)             # 2^(M + ceil(log2 mu))
-                                                          # sigma0 overflows only when mu is near the top of the range, i.e. the sum
-                                                          # itself overflows; the caller falls back to the superaccumulator in that case.
   if not isFin(sigma0):
-    pPrime = newSeq[T](0)
-    return (T(Inf), T(0))
+    return (T(Inf), T(0)) # sigma0 overflow: the sum overflows; caller falls back
   let sigmaFloor = T(0.5) * (T(1) / eps) * eta # 0.5·eps^-1·eta (subnormal stop)
   var sigma = sigma0
-  var t = T(0)
-  var tPrev = T(0)
+  var t = offset
+  var tPrev = offset
   var tauLast = T(0)
-  var pCur = newSeq[T](n)
-  for i in 0 ..< n:
-    pCur[i] = p[i]
-  var pNext = newSeq[T](n)
   while true:
-    tauLast = extractVector(sigma, pCur, pNext)
+    tauLast = extractVector(sigma, p)
     tPrev = t
     t = t + tauLast
     let thresh = pow2i[T](2 * m) * eps * sigma         # 2^(2M)·eps·sigma
     if abs(t) >= thresh or sigma <= sigmaFloor:
-      pPrime = pNext
-      break
-    sigma = sigma * pow2i[T](m) * eps # sigma_m = 2^M·eps·sigma_{m-1}
-    swap(pCur, pNext) # reuse the two buffers, no per-iteration allocation
-  # An overflow during accumulation (t -> Inf) breaks the error-free property;
-  # signal it so the caller falls back to the superaccumulator.
-  if not isFin(t):
-    pPrime = newSeq[T](0)
-    return (T(Inf), T(0))
-  # (tau1, tau2) = FastTwoSum(t^{m-1}, tau^{m}); twoSum is value-identical and
-  # needs no |a| >= |b| precondition (the operands are finite: bounded by sigma0).
-  twoSum(tPrev, tauLast)
+      let tau2 = tauLast - (t - tPrev) # FastTwoSum(tPrev, tauLast): exact at stop
+      return (t, tau2)
+    sigma = sigma * pow2i[T](m) * eps # sigma_{m} = 2^M·eps·sigma_{m-1}
 
-func prepend[T: SomeFloat](head: T, tail: openArray[T]): seq[T] =
-  ## `[head, tail[0], tail[1], ...]` as a fresh seq. Used by `nearSum` to feed
-  ## the midpoint-offset residual into a second faithful sum. Hand-written
-  ## rather than `sequtils.concat(@[head], tail)` so a single `seq[T]` type
-  ## flows through (the Nim ARC codegen can mint two distinct C types for the
-  ## literal and the residual under `--mm:arc`, which `concat`'s
-  ## `openArray[seq[T]]` then cannot hold).
-  result = newSeq[T](tail.len + 1)
-  result[0] = head
-  for i in 0 ..< tail.len:
-    result[i + 1] = tail[i]
-
-func faithfulSum[T: SomeFloat](x: openArray[T]): T =
-  ## Rump `AccSum` core (Part I, Alg 4.5): `tau1 + (tau2 + sum(pPrime))`, the
-  ## faithful rounding of `sum(x)`. Assumes finite `x` with a non-overflowing
-  ## `sigma0` — the public `accSum` guards both and falls back otherwise.
-  var pPrime: seq[T]
-  let (tau1, tau2) = rumpTransform(x, pPrime)
+func rumpTransformK[T: SomeFloat](p: var seq[T], offset: T): T =
+  ## Rump `TransformK` (Part II, Alg 6.2): a faithful rounding of
+  ## `sum(p) + offset` — `fl(tau1 + (tau2 + sum(p')))` after `rumpTransform`. By
+  ## Lemma 6.3 the result is `0` iff the exact `sum(p) + offset` is zero, the
+  ## property `nearSum` uses for exact-tie detection at the rounding midpoint.
+  ## `p` is overwritten with the residual. Returns `Inf` on a `sigma0` overflow.
+  let (tau1, tau2) = rumpTransform(p, offset)
   if not isFin(tau1):
     return T(Inf) # sentinel for the sigma0-overflow path
-  result = tau1 + (tau2 + naiveSum(pPrime))
+  result = tau1 + (tau2 + naiveSum(p))
 
 func accSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Rump `AccSum` (Part I, Alg 4.5): a *faithful* rounding of `sum(x)` — no
@@ -334,62 +321,79 @@ func accSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   body:
     if x.len == 0:
       return T(0)
+    if x.len == 1:
+      return x[0]
     if not allFin(x):
       return superSum(x)
-    var pPrime: seq[T]
-    let (tau1, tau2) = rumpTransform(x, pPrime)
+    var p = newSeq[T](x.len)
+    for i in 0 ..< x.len:
+      p[i] = x[i]
+    let (tau1, tau2) = rumpTransform(p, T(0))         # p is now the residual p'
     if not isFin(tau1): # sigma0-overflow or mid-accumulation overflow
       return superSum(x)
-    result = tau1 + (tau2 + naiveSum(pPrime))
+    result = tau1 + (tau2 + naiveSum(p))
 
 func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Rump `NearSum` (Part II, Alg 7.4): the *correctly rounded* sum — the
   ## IEEE-754 round-to-nearest of the exact `sum(x)`, bit-for-bit. Runs
-  ## `Transform` for a faithful result and residual, then resolves the rounding
-  ## direction with a second faithful sum of the residual offset to the
-  ## midpoint between the two candidate floats.
+  ## `Transform` once for a faithful result and the residual `p'`, then resolves
+  ## the rounding direction with a second `TransformK(p', R - delta')` offset to
+  ## the midpoint between the two candidate floats (Lemma 7.3): its sign picks
+  ## `pred`/`res`/`succ`, and the zero case is the exact tie, rounded by
+  ## `fl(res + delta')` with ties-to-even.
   ##
   ## The fallback and contract match `accSum`: non-finite input or a
-  ## `sigma0` overflow delegates to `superSum` (also correctly rounded).
+  ## `sigma0` overflow delegates to `superSum` (also correctly rounded). The
+  ## correctly-rounded guarantee holds under `2^(2M)·eps <= 1` (`M =
+  ## ceil(log2(n+2))`): `n <= 6.7e7` (float64), `n <= 4094` (float32).
   ensure:
     x.len != 0 or result == T(0)
     not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
   body:
     if x.len == 0:
       return T(0)
+    if x.len == 1:
+      return x[0]
     if not allFin(x):
       return superSum(x)
-    var pPrime: seq[T]
-    let (tau1, tau2) = rumpTransform(x, pPrime)
+    var p = newSeq[T](x.len)
+    for i in 0 ..< x.len:
+      p[i] = x[i]
+    let (tau1, tau2) = rumpTransform(p, T(0))         # p is now the residual p'
     if not isFin(tau1): # sigma0-overflow → exact fallback
       return superSum(x)
+    let tau20 = tau2 + naiveSum(p) # fl(tau2 + sum(p'))
+    let res = tau1 + tau20 # FastTwoSum(tau1, tau20): |tau1| >= |tau20|
+    let delta = tau20 - (res - tau1) # res + delta = tau1 + tau20 exactly
+    if delta == T(0):
+      return res # the exact sum is a float
+    let r = tau2 - (res - tau1) # R = tau2 - Delta; sum(x) - res = R + sum(p') exactly
     when T is float64:
       const eta = cast[float64](1'u64) # 2^-1074
     else:
       const eta = cast[float32](1'u32) # 2^-149
-    let tau2p = tau2 + naiveSum(pPrime)
-    let (res, delta) = twoSum(tau1, tau2p) # res + delta = tau1 + tau2p faithfully
-    if delta == T(0):
-      return res # the exact sum is a float
-    let r = tau2 - (res - tau1) # s - res = r + sum(pPrime), exactly
-    if delta < T(0): # fl(s) ∈ {pred(res), res}
+    if delta < T(0): # fl(S) ∈ {pred(res), res}
       let gamma = prevFloat(res) - res # < 0
       if gamma == -eta:
-        return res # no predecessor in F (res at the negative exponent floor)
+        return res # no predecessor in F (res at the exponent floor)
       let dp = gamma / T(2) # midpoint toward pred(res)
-      let d2 = faithfulSum(prepend(r - dp, pPrime)) # sign of s - midpoint
+      let d2 = rumpTransformK(p, r - dp) # faithful(S - midpoint); 0 iff exact tie
+      if not isFin(d2):
+        return superSum(x)
       if d2 > T(0):
         return res
       elif d2 < T(0):
         return prevFloat(res)
       else:
-        return res + dp # exactly the midpoint
-    else: # delta > 0: fl(s) ∈ {res, succ(res)}
+        return res + dp # exact tie: fl(midpoint) rounds to-even
+    else: # delta > 0: fl(S) ∈ {res, succ(res)}
       let gamma = nextFloat(res) - res # > 0
       if gamma == eta:
         return res
       let dp = gamma / T(2)
-      let d2 = faithfulSum(prepend(r - dp, pPrime))
+      let d2 = rumpTransformK(p, r - dp)
+      if not isFin(d2):
+        return superSum(x)
       if d2 > T(0):
         return nextFloat(res)
       elif d2 < T(0):
