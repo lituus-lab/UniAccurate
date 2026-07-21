@@ -141,9 +141,15 @@ int main(void) {
   double dcy[] = {1.0, 1.0, 1.0};
   dot_call("dot2 recovers cancel", ua_dot2, dcx, dcy, 3, 1.0);
   dot_k_call("dot_k K=1 [1..3]·[4..6]", ua_dot_k, a, b, 3, 1, 32.0);
-  dot_k_call("dot_k K=2 == dot2 cancel", ua_dot_k, dcx, dcy, 3, 2, 1.0);
+  { double g2 = ua_dot2(dcx, dcy, 3);   /* K=2 parity: dot_k(.,.,2) == dot2 bit-for-bit */
+    double gk2 = ua_dot_k(dcx, dcy, 3, 2);
+    if (g2 != gk2) { printf("FAIL dot_k K=2 == dot2: got %g vs %g\n", gk2, g2); failures++; }
+    else printf("ok   dot_k K=2 == dot2 cancel = %g\n", g2); }
   dot_k_call("dot_k K=3 cancel", ua_dot_k, dcx, dcy, 3, 3, 1.0);
-  dot_k_call("dot_k K=0 == K=1", ua_dot_k, a, b, 3, 0, 32.0);
+  { double gk0 = ua_dot_k(a, b, 3, 0);  /* K<1 treated as 1: K=0 == K=1 bit-for-bit */
+    double gk1 = ua_dot_k(a, b, 3, 1);
+    if (gk0 != gk1) { printf("FAIL dot_k K=0 == K=1: got %g vs %g\n", gk0, gk1); failures++; }
+    else printf("ok   dot_k K=0 == K=1 = %g\n", gk0); }
   dot_k_call("dot_k empty", ua_dot_k, NULL, NULL, 0, 3, 0.0);
   { double g = ua_dot_naive(px, py, 2); /* finite m·(-m) + m·m overflow, no NaN */
     if (isnan(g)) { printf("FAIL naive dot overflow: got NaN want finite/inf\n"); failures++; }
