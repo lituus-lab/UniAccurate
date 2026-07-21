@@ -145,9 +145,12 @@ template dotSuite(T: typedesc) =
       check superDot(x, x) == T(0.0)
 
     test "product overflow is held at its true magnitude (not ±Inf)":
-      # 1e100·1e100 = 1e200, beyond the float64 (or float32) range for the
-      # product alone, but the exact accumulator holds it; subtracting the same
-      # product leaves the small term, recovered exactly.
+      # 1e100·1e100 = 1e200, representable in float64 (max ~1.8e308); the
+      # float32 branch uses 1e10·1e10 = 1e20, also representable. The product
+      # alone does not overflow either precision: the exact accumulator's role
+      # here is to hold the product and the subtracted term in the integer
+      # domain and round once, yielding the true magnitude rather than an
+      # intermediate rounding of the product.
       when T is float64:
         let big = T(1e100)
         check superDot([big, T(1.0)], [big, T(-1.0)]) == big * big - T(1.0)
