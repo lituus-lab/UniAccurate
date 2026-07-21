@@ -78,10 +78,12 @@ func transform[T: SomeFloat](x: openArray[T], err: var seq[T]): T =
   ## localizes.
   let n = x.len
   if n == 0:
-    err = newSeq[T](0)
+    err.setLen(0)
     return T(0)
   result = x[0]
-  err = newSeq[T](n - 1)
+  err.setLen(n - 1) # reuse the caller's buffer; sumK swaps two buffers whose
+                    # lengths strictly decrease, so this never reallocates in the
+                    # cascade steady state (cap is already large enough).
   for i in 1 ..< n:
     if not isFin(result) or not isFin(x[i]):
       result = result + x[i]
