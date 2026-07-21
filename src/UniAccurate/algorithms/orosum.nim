@@ -388,7 +388,9 @@ func conditionNumber*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ##
   ## The numerator is a plain sum of absolutes (no cancellation, so accurate to
   ## `gamma_{n-1}` without compensation); the denominator uses `neumaierSum`
-  ## (magnitude-robust) so a near-zero sum is detected reliably.
+  ## (magnitude-robust) so a near-zero sum is detected reliably. A numerator
+  ## that overflows the float range (`Σ|x_i|` past the max) signals an
+  ## ill-conditioned sum and returns `Inf` rather than `Inf/Inf = NaN`.
   ensure:
     not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
   body:
@@ -397,6 +399,8 @@ func conditionNumber*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     var s = T(0)
     for v in x:
       s += abs(v)
+    if classify(s) == fcInf:
+      return T(Inf) # Σ|x_i| overflowed: the exact ratio is not representable
     let denom = abs(neumaierSum(x))
     if denom == T(0):
       return T(Inf)
