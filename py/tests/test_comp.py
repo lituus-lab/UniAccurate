@@ -11,6 +11,7 @@ COMPS = [
     ("neumaier_sum", uniaccurate.neumaier_sum),
     ("klein_sum", uniaccurate.klein_sum),
     ("shewchuk_sum", uniaccurate.shewchuk_sum),
+    ("exact_sum", uniaccurate.exact_sum),
 ]
 
 # Where Kahan loses a small addend dominated by the running sum, Neumaier and
@@ -52,7 +53,8 @@ def test_kahan_loses_dominated_addend():
 
 @pytest.mark.parametrize("name,fn", [("neumaier_sum", uniaccurate.neumaier_sum),
                                      ("klein_sum", uniaccurate.klein_sum),
-                                     ("shewchuk_sum", uniaccurate.shewchuk_sum)])
+                                     ("shewchuk_sum", uniaccurate.shewchuk_sum),
+                                     ("exact_sum", uniaccurate.exact_sum)])
 def test_magnitude_robust_recovers(name, fn):
     assert fn(MAGNITUDE) == 2.0
 
@@ -86,3 +88,4 @@ def test_all_compensated_agree_on_exact_data():
     assert uniaccurate.neumaier_sum(x) == n
     assert uniaccurate.klein_sum(x) == n
     assert uniaccurate.shewchuk_sum(x) == n
+    assert uniaccurate.exact_sum(x) == n

@@ -19,6 +19,7 @@ from oracle import (
     bound_correctly_rounded,
     bound_naive,
     bound_pairwise,
+    exact_dot,
     exact_sum,
 )
 
@@ -33,6 +34,7 @@ ALGS = [
     ("neumaier_sum", uniaccurate.neumaier_sum, partial(bound_compensated, leading=2)),
     ("klein_sum", uniaccurate.klein_sum, partial(bound_compensated, leading=2)),
     ("shewchuk_sum", uniaccurate.shewchuk_sum, bound_correctly_rounded),
+    ("exact_sum", uniaccurate.exact_sum, bound_correctly_rounded),
 ]
 
 SIZES = [1, 2, 3, 5, 10, 50, 100, 500, 1000]
@@ -89,5 +91,30 @@ def test_forward_bound(name, fn, bound, case):
     limit = bound(len(xs), e, s)
     assert err <= limit, (
         f"{name} {label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
+        f"(E={float(e):.6e}, n={len(xs)})"
+    )
+
+
+# Correctly-rounded dot product: a single final rounding of the exact real dot,
+# so the bound is 0.5 ulp of fl(S) with S = exact_dot(xs, ys).
+DOT_CASES = [
+    (f"dot_uniform01_{n}", _uniform(0, 1, n), _uniform(0, 1, n)) for n in SIZES
+] + [
+    (f"dot_mixed_{n}", _mixed_magnitude(n), _mixed_magnitude(n)) for n in SIZES
+] + [
+    (f"dot_cancel_{n}", _cancellation(n), _uniform(0.5, 1.5, 2 * max(1, n // 2)))
+    for n in SIZES
+]
+DOT_IDS = [c[0] for c in DOT_CASES]
+
+
+@pytest.mark.parametrize("label,xs,ys", DOT_CASES, ids=DOT_IDS)
+def test_dot_exact_forward_bound(label, xs, ys):
+    s = exact_dot(xs, ys)
+    e = sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys))
+    err = abs(Fraction(uniaccurate.exact_dot(xs, ys)) - s)
+    limit = bound_correctly_rounded(len(xs), e, s)
+    assert err <= limit, (
+        f"{label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
         f"(E={float(e):.6e}, n={len(xs)})"
     )

@@ -51,6 +51,11 @@ def abs_sum(values):
     return sum(abs(Fraction(v)) for v in values)
 
 
+def exact_dot(xs, ys):
+    """Exact real dot product ``sum(x_i * y_i)`` (floats coerced to rationals)."""
+    return sum(Fraction(x) * Fraction(y) for x, y in zip(xs, ys))
+
+
 def gamma(k: int) -> Fraction:
     """Higham's ``gamma_k = k*u / (1 - k*u)``; ``0`` for ``k <= 0``."""
     if k <= 0:

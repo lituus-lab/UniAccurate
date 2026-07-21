@@ -10,6 +10,8 @@ from ._core import (
     _sum_neumaier_c,
     _sum_klein_c,
     _sum_shewchuk_c,
+    _sum_exact_c,
+    _dot_exact_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -98,6 +100,26 @@ def shewchuk_sum(values):
     return _sum_shewchuk_c(_validate(values))
 
 
+def exact_sum(values):
+    """Correctly-rounded sum (Neal small superaccumulator: integer exact
+    accumulation, single final rounding). Empty input is 0.0. NaN/Inf propagate;
+    finite inputs never yield NaN (true overflow gives ±Inf, opposite-sign
+    overflow cancels exactly). Raises TypeError on non-numeric elements.
+    """
+    return _sum_exact_c(_validate(values))
+
+
+def exact_dot(xs, ys):
+    """Correctly-rounded dot product `sum(x_i * y_i)` (Neal small
+    superaccumulator: 64x64->128 product accumulation, single final rounding).
+    Empty input is 0.0. NaN/Inf operands propagate; finite operands never yield
+    NaN (products held at true magnitude, opposite-sign overflow cancels
+    exactly). Raises TypeError on non-numeric elements, ValueError on
+    mismatched lengths.
+    """
+    return _dot_exact_c(_validate(xs), _validate(ys))
+
+
 def version():
     """C library version string."""
     return _version_c().decode("ascii")
@@ -105,6 +127,8 @@ def version():
 
 __all__ = [
     "__version__",
+    "exact_dot",
+    "exact_sum",
     "kahan_sum",
     "klein_sum",
     "naive_sum",
