@@ -6,11 +6,13 @@ import UniAccurate/algorithms/naivesum
 import UniAccurate/algorithms/pairwisesum
 import UniAccurate/algorithms/compensatedsum
 import UniAccurate/algorithms/shewchuksum
+import UniAccurate/algorithms/exactsum
 export twosum
 export naivesum
 export pairwisesum
 export compensatedsum
 export shewchuksum
+export exactsum
 when defined(simd):
   import UniAccurate/simd
   export simd
