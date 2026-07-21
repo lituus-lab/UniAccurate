@@ -132,6 +132,13 @@ func isFin*(x: SomeFloat): bool {.inline.} =
   ## EFT precondition rests on: a compensated algorithm that meets a non-finite
   ## operand or partial sum diverts that step to a plain IEEE `+`, so NaN/Inf
   ## propagate as a naive sum would and finite inputs never raise.
+  ##
+  ## Bit-mask test (exp field all-ones ⇔ NaN/±Inf) instead of routing through
+  ## `classify`: a full `fpclassify` is an external call the compiler cannot
+  ## inline, and this predicate runs once per element inside every compensated
+  ## sum's hot loop. The mask is one `and` + one compare, fully inlinable, with
+  ## bit-identical semantics (zero, subnormal and normal all have an exponent
+  ## field below the all-ones NaN/Inf encoding).
   runnableExamples:
     doAssert isFin(1.0)
     doAssert isFin(0.0)
@@ -139,7 +146,10 @@ func isFin*(x: SomeFloat): bool {.inline.} =
     doAssert not isFin(NaN)
     doAssert not isFin(Inf)
     doAssert not isFin(-Inf)
-  classify(x) notin {fcNan, fcInf, fcNegInf}
+  when x is float64:
+    (cast[uint64](x) and 0x7FF0000000000000'u64) != 0x7FF0000000000000'u64
+  else:
+    (cast[uint32](x) and 0x7F800000'u32) != 0x7F800000'u32
 
 func allFin*[T: SomeFloat](x: openArray[T]): bool {.inline.} =
   ## True iff every element of `x` is finite (`isFin`). The finite-input safety
