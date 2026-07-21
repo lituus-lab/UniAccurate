@@ -2,9 +2,9 @@
 <!-- Copyright 2026 lituus-lab -->
 # UniAccurate
 
-Error-free transforms and accurate summation for floating-point arithmetic:
-naive, pairwise, and compensated sums, in Nim, with a hand-written C ABI and
-a Cython Python binding.
+Error-free transforms and accurate summation/dot-product for floating-point
+arithmetic: naive, pairwise, and compensated sums, and compensated dot
+products, in Nim, with a hand-written C ABI and a Cython Python binding.
 
 ## Layout
 
