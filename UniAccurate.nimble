@@ -167,6 +167,8 @@ task testSimd, "Scalar Nim tests compiled under -d:simd (host ISA)":
   exec "nim c -r -d:simd" & simdArch &
        " --path:src -o:build/test_exact_simd tests/test_exactsum.nim"
   exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_oro_simd tests/test_orosum.nim"
+  exec "nim c -r -d:simd" & simdArch &
        " --path:src -o:build/test_prop_simd tests/test_property.nim"
 
 task clibSimd, "C shared library with -d:simd (host ISA)":
