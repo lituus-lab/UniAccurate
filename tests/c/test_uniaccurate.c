@@ -101,6 +101,20 @@ int main(void) {
   double py[] = {m, m};
   dot_call("exact dot opposite-sign cancel", ua_dot_exact, px, py, 2, 0.0);
 
+  /* ORO sum2 (magnitude-robust compensated): integer-exact, empty 0, recovers
+   * 0.1·10 and the cancellation case where Kahan loses the small addends. */
+  sum_call("oro [1..4]", ua_sum_oro, small, 4, 10.0);
+  sum_call("oro empty", ua_sum_oro, NULL, 0, 0.0);
+  sum_call("oro 0.1x10", ua_sum_oro, tenths, 10, 1.0);
+  sum_call("oro cancel", ua_sum_oro, cancel, 4, 2.0);
+
+  /* Rump NearSum (correctly rounded): bit-exact with ua_sum_exact on the same
+   * cases — integer-exact, empty 0, 0.1·10 → 1.0, cancellation → 2.0. */
+  sum_call("near [1..4]", ua_sum_near, small, 4, 10.0);
+  sum_call("near empty", ua_sum_near, NULL, 0, 0.0);
+  sum_call("near 0.1x10", ua_sum_near, tenths, 10, 1.0);
+  sum_call("near cancel", ua_sum_near, cancel, 4, 2.0);
+
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
   return 1;

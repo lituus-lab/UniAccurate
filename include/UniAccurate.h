@@ -67,6 +67,19 @@ double ua_sum_exact(const double *x, size_t n);
  * exactly). Never raises. Null x or y with n > 0 is undefined. */
 double ua_dot_exact(const double *x, const double *y, size_t n);
 
+/* ORO sum2 (Alg 4.1) — the magnitude-robust compensated sum, value-identical to
+ * ua_sum_neumaier. Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate;
+ * finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
+ * Single-threaded, reentrant. Null x with n > 0 is undefined. */
+double ua_sum_oro(const double *x, size_t n);
+
+/* Rump NearSum (Alg 7.4) — the correctly-rounded sum, the round-to-nearest of
+ * the exact real sum bit-for-bit. Empty input (n == 0, x may be NULL) is 0.
+ * NaN/Inf propagate (non-finite input or a sigma0 overflow falls back to the
+ * exact superaccumulator); finite inputs never yield NaN (overflow ⇒ ±Inf).
+ * Never raises. Single-threaded, reentrant. Null x with n > 0 is undefined. */
+double ua_sum_near(const double *x, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

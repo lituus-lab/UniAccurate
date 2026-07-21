@@ -164,4 +164,27 @@ proc ua_dot_exact(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   superDot(toOpenArray(ax, 0, last), toOpenArray(ay, 0, last))
 
+proc ua_sum_oro(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## ORO `sum2` (Alg 4.1) — the magnitude-robust compensated sum, value-identical
+  ## to `neumaierSum`. Empty input is `0`. Never raises; NaN/Inf propagate.
+  ## Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is
+  ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  sum2(toOpenArray(arr, 0, last))
+
+proc ua_sum_near(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Rump `NearSum` (Alg 7.4) — the correctly-rounded sum, the round-to-nearest
+  ## of the exact `Σ xᵢ` bit-for-bit. Empty input is `0`. Never raises; NaN/Inf
+  ## propagate (non-finite input or a `sigma0` overflow falls back to the exact
+  ## superaccumulator). Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x`
+  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  nearSum(toOpenArray(arr, 0, last))
+
 {.pop.}
