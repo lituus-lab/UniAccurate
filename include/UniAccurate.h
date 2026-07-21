@@ -46,9 +46,11 @@ double ua_sum_klein(const double *x, size_t n);
 
 /* Correctly-rounded sum of n doubles at x (Shewchuk adaptive-precision
  * expansion, the CPython fsum recipe): the exact real sum rounded once under
- * round-to-nearest-even. Empty input (n == 0, x may be NULL) is 0. NaN/Inf
- * propagate; finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
- * Single-threaded, reentrant. Null x with n > 0 is undefined. */
+ * round-to-nearest-even, for finite non-overflowing input. Empty input
+ * (n == 0, x may be NULL) is 0. An intermediate overflow abandons the exact
+ * expansion and yields a correctly-signed ±Inf (finite input never yields NaN);
+ * NaN/Inf in the input propagate. Never raises. Single-threaded, reentrant.
+ * Null x with n > 0 is undefined. */
 double ua_sum_shewchuk(const double *x, size_t n);
 
 #ifdef __cplusplus

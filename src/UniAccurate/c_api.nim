@@ -127,9 +127,11 @@ proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
 proc ua_sum_shewchuk(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Correctly-rounded sum of `n` doubles at `x` via Shewchuk's adaptive-precision
   ## expansion (the CPython `fsum` recipe): `Σ xᵢ` rounded once under
-  ## round-to-nearest-even. Empty input is `0`. Never raises; NaN/Inf propagate.
-  ## Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is
-  ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  ## round-to-nearest-even, for finite non-overflowing input. Empty input is
+  ## `0`. Never raises; NaN/Inf propagate. An intermediate overflow abandons the
+  ## exact expansion and yields a correctly-signed ±Inf (finite input never
+  ## yields NaN). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar
+  ## under `-d:simd` (ADR-0007).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)

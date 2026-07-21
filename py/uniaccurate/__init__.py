@@ -89,9 +89,11 @@ def klein_sum(values):
 
 def shewchuk_sum(values):
     """Correctly-rounded sum (Shewchuk adaptive-precision expansion, the CPython
-    fsum recipe): the exact real sum rounded once under round-to-nearest-even.
-    Empty input is 0.0. NaN/Inf propagate; finite inputs never yield NaN
-    (overflow gives ±Inf). Raises TypeError on non-numeric elements.
+    fsum recipe): the exact real sum rounded once under round-to-nearest-even,
+    for finite non-overflowing input. Empty input is 0.0. NaN/Inf propagate; an
+    intermediate overflow abandons the exact expansion and yields a
+    correctly-signed ±Inf (finite inputs never yield NaN). Raises TypeError on
+    non-numeric elements.
     """
     return _sum_shewchuk_c(_validate(values))
 
