@@ -13,10 +13,18 @@ from functools import partial
 import pytest
 
 import uniaccurate
-from oracle import abs_sum, bound_compensated, bound_naive, bound_pairwise, exact_sum
+from oracle import (
+    abs_sum,
+    bound_compensated,
+    bound_correctly_rounded,
+    bound_naive,
+    bound_pairwise,
+    exact_sum,
+)
 
-# (name, function, bound(n, E)). The compensated bound closes over `leading`:
-# 3 for Kahan (no final +c), 2 for Neumaier/Klein (final +c applied).
+# (name, function, bound(n, E, S)). The compensated bound closes over `leading`:
+# 3 for Kahan (no final +c), 2 for Neumaier/Klein (final +c applied). The
+# correctly-rounded bound uses the exact sum S (0.5 ulp of fl(S)).
 ALGS = [
     ("naive_sum", uniaccurate.naive_sum, bound_naive),
     ("pairwise_sum", uniaccurate.pairwise_sum, bound_pairwise),
@@ -24,6 +32,7 @@ ALGS = [
     ("kahan_sum", uniaccurate.kahan_sum, partial(bound_compensated, leading=3)),
     ("neumaier_sum", uniaccurate.neumaier_sum, partial(bound_compensated, leading=2)),
     ("klein_sum", uniaccurate.klein_sum, partial(bound_compensated, leading=2)),
+    ("shewchuk_sum", uniaccurate.shewchuk_sum, bound_correctly_rounded),
 ]
 
 SIZES = [1, 2, 3, 5, 10, 50, 100, 500, 1000]
@@ -77,7 +86,7 @@ CASE_IDS = [c[0] for c in CASES]
 def test_forward_bound(name, fn, bound, case):
     label, xs, s, e = case
     err = abs(Fraction(fn(xs)) - s)
-    limit = bound(len(xs), e)
+    limit = bound(len(xs), e, s)
     assert err <= limit, (
         f"{name} {label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
         f"(E={float(e):.6e}, n={len(xs)})"

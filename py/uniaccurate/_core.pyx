@@ -12,6 +12,7 @@ cdef extern from "UniAccurate.h":
     double ua_sum_kahan(const double *x, size_t n)
     double ua_sum_neumaier(const double *x, size_t n)
     double ua_sum_klein(const double *x, size_t n)
+    double ua_sum_shewchuk(const double *x, size_t n)
 
 
 def two_sum(double a, double b):
@@ -70,3 +71,8 @@ def _sum_neumaier_c(list values):
 def _sum_klein_c(list values):
     """Raw C call: Klein two-level compensated sum of `values`."""
     return _sum_raw(values, ua_sum_klein)
+
+
+def _sum_shewchuk_c(list values):
+    """Raw C call: correctly-rounded (Shewchuk expansion) sum of `values`."""
+    return _sum_raw(values, ua_sum_shewchuk)

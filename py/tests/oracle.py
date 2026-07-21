@@ -65,20 +65,73 @@ def ceil_log2(n: int) -> int:
     return (n - 1).bit_length()
 
 
-def bound_naive(n: int, e: Fraction) -> Fraction:
-    """Recursive (naive) summation forward bound: ``gamma_{n-1} * E``."""
+def bound_naive(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
+    """Recursive (naive) summation forward bound: ``gamma_{n-1} * E``.
+
+    ``s`` (the exact sum) is unused — the naive bound is in the magnitude ``E``.
+    """
     return gamma(n - 1) * e
 
 
-def bound_pairwise(n: int, e: Fraction) -> Fraction:
-    """Pairwise (cascade) forward bound — rounding depth ``ceil(log2 n)``."""
+def bound_pairwise(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
+    """Pairwise (cascade) forward bound — rounding depth ``ceil(log2 n)``.
+
+    ``s`` is unused (see ``bound_naive``).
+    """
     return gamma(ceil_log2(n)) * e
 
 
-def bound_compensated(n: int, e: Fraction, leading: int) -> Fraction:
+def bound_compensated(n: int, e: Fraction, s: Fraction = 0, *,
+                      leading: int) -> Fraction:
     """Compensated summation forward bound.
 
     ``leading`` is ``3`` for Kahan (no final correction, Hallman & Ipsen 2022)
     and ``2`` for Neumaier/Klein (final ``+ c`` applied, Higham 2002 (4.8)).
+    ``s`` is unused (see ``bound_naive``).
     """
     return _COMP_SAFETY * (U * leading + (4 * n + 6) * U * U) * e
+
+
+def _pow2(e: int) -> Fraction:
+    """Exact ``2**e`` as a ``Fraction`` (``e`` may be negative)."""
+    if e >= 0:
+        return Fraction(1 << e)
+    return Fraction(1, 1 << -e)
+
+
+def _floor_log2(x: Fraction) -> int:
+    """Largest ``e`` with ``2**e <= x`` for positive ``x``."""
+    num, den = x.numerator, x.denominator
+    # 2**e * den <= num  <=>  2**e <= num/den = x; compare in integers via
+    # scaling by 2**k so the shift stays non-negative.
+    e = num.bit_length() - den.bit_length()
+    # Adjust so 2**e * den and num compare without negative shifts: lift both
+    # sides by a power of two when e is negative.
+    k = max(0, -e)
+    lhs = (1 << (e + k)) * den  # = 2**(e+k) * den
+    rhs = num << k              # = num * 2**k
+    if lhs <= rhs:
+        while (1 << (e + 1 + k)) * den <= (num << k):
+            e += 1
+    else:
+        while (1 << (e + k)) * den > (num << k):
+            e -= 1
+    return e
+
+
+def bound_correctly_rounded(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
+    """Correctly-rounded forward bound: ``0.5 * ulp(fl(S))``.
+
+    A single round-to-nearest of the exact sum ``S`` errs by at most half a unit
+    in the last place of the rounded result. ``ulp(fl(S)) <= 2**(e-51)`` for
+    ``2**e <= |S| < 2**(e+1)`` (the rounded result may cross the bin boundary
+    upward), so ``0.5 * ulp(fl(S)) <= 2**(e-52) = (2u) * 2**e`` — a rigorous,
+    at most 2x loose upper bound, computed in exact arithmetic. Subnormal ``S``
+    gets the half subnormal-ulp ``2**-1074``; ``S == 0`` is exact (bound ``0``).
+    """
+    if s == 0:
+        return Fraction(0)
+    e = _floor_log2(abs(s))
+    if e < -1022:  # subnormal range: ulp is the smallest subnormal
+        return Fraction(1, 1 << 1074)
+    return (2 * U) * _pow2(e)

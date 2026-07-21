@@ -9,6 +9,7 @@ from ._core import (
     _sum_kahan_c,
     _sum_neumaier_c,
     _sum_klein_c,
+    _sum_shewchuk_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -86,6 +87,15 @@ def klein_sum(values):
     return _sum_klein_c(_validate(values))
 
 
+def shewchuk_sum(values):
+    """Correctly-rounded sum (Shewchuk adaptive-precision expansion, the CPython
+    fsum recipe): the exact real sum rounded once under round-to-nearest-even.
+    Empty input is 0.0. NaN/Inf propagate; finite inputs never yield NaN
+    (overflow gives ±Inf). Raises TypeError on non-numeric elements.
+    """
+    return _sum_shewchuk_c(_validate(values))
+
+
 def version():
     """C library version string."""
     return _version_c().decode("ascii")
@@ -99,6 +109,7 @@ __all__ = [
     "neumaier_sum",
     "pairwise_sum",
     "pairwise_sum_iterative",
+    "shewchuk_sum",
     "two_sum",
     "version",
 ]
