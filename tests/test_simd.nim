@@ -48,9 +48,9 @@ when defined(simd):
     cast[float32](bits)
 
   proc randomDotF32(r: var uint64): float32 =
-    ## Finite float32 for dot suites: exponent halved (unbiased [-25, 34]) so
-    ## products stay finite (unbiased <= 68) and the running sum of up to 1e4 of
-    ## them (unbiased <= 82) never overflows the float32 range.
+    ## Finite float32 for dot suites: exponent halved (unbiased [-29, 30]) so
+    ## products stay finite (unbiased <= 60) and the running sum of up to 1e4 of
+    ## them (unbiased <= 74) never overflows the float32 range.
     let expField = uint32(next(r) mod 60 + 98)
     var bits = expField shl 23
     bits = bits or (uint32(next(r)) and 0x007F_FFFF'u32)
