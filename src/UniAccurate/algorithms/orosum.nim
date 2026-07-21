@@ -62,33 +62,34 @@
 ## - Higham, N.J. (2002). *Accuracy and Stability of Numerical Algorithms*,
 ##   2nd ed., §4.3. SIAM. ISBN 978-0-89871-521-7
 import std/math
-import std/sequtils
 import contracts
 import ../twosum
 import compensatedsum
 import naivesum
 import exactsum
 
-func transform[T: SomeFloat](x: openArray[T]): tuple[res: T, err: seq[T]] =
+func transform[T: SomeFloat](x: openArray[T], err: var seq[T]): T =
   ## ORO Vecsum (Alg 4.6): error-free transform of a sum. Chains `twoSum`
-  ## across `x` so that `res + sum(err) == sum(x)` exactly in real arithmetic,
-  ## with `res = fl(Σ xᵢ)` the naive sum and `err` the `n-1` rounding errors.
-  ## A non-finite operand degrades that step to naive IEEE propagation (the
-  ## EFT is lost, the error slot is set to 0); a step whose sum overflows
-  ## produces a NaN error, which the cascade's `isFin` guard localizes.
+  ## across `x` so that `result + sum(err) == sum(x)` exactly in real arithmetic,
+  ## with `result = fl(Σ xᵢ)` the naive sum and `err` (written through the out-
+  ## param) the `n-1` rounding errors. A non-finite operand degrades that step to
+  ## naive IEEE propagation (the EFT is lost, the error slot is set to 0); a step
+  ## whose sum overflows produces a NaN error, which the cascade's `isFin` guard
+  ## localizes.
   let n = x.len
   if n == 0:
-    return (T(0), newSeq[T](0))
-  result.res = x[0]
-  result.err = newSeq[T](n - 1)
+    err = newSeq[T](0)
+    return T(0)
+  result = x[0]
+  err = newSeq[T](n - 1)
   for i in 1 ..< n:
-    if not isFin(result.res) or not isFin(x[i]):
-      result.res = result.res + x[i]
-      result.err[i - 1] = T(0)
+    if not isFin(result) or not isFin(x[i]):
+      result = result + x[i]
+      err[i - 1] = T(0)
     else:
-      let (s, e) = twoSum(result.res, x[i])
-      result.res = s
-      result.err[i - 1] = e
+      let (s, e) = twoSum(result, x[i])
+      result = s
+      err[i - 1] = e
 
 func sum2*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## ORO `sum2` (Alg 4.1) — the magnitude-robust compensated sum. Identical in
@@ -123,14 +124,13 @@ func sumK*[T: SomeFloat](x: openArray[T], K: int): T {.contractual.} =
     if x.len == 1:
       return x[0]
     let k = if K < 1: 1 else: K
-    var res: T
-    var err: seq[T]
-    (res, err) = transform(x)
-    result = res
+    var cur: seq[T]
+    result = transform(x, cur)
+    var nxt: seq[T]
     for _ in 1 ..< k:
-      if err.len == 0:
+      if cur.len == 0:
         break
-      (res, err) = transform(err)
+      let res = transform(cur, nxt)
       # An overflow poisons the error vector (a `twoSum` whose sum overflows
       # yields a NaN error), so a later partial `res` can be NaN/Inf. Adding it
       # to a running ±Inf would evaluate Inf - Inf = NaN; the true finite sum
@@ -138,6 +138,7 @@ func sumK*[T: SomeFloat](x: openArray[T], K: int): T {.contractual.} =
       # once the running sum overflowed (±Inf is the correctly-signed round).
       if isFin(result):
         result += res
+      swap(cur, nxt) # reuse the two buffers, no per-iteration allocation
 
 # ---------------------------------------------------------------------------
 # Rump faithful / correctly-rounded family (Rump–Ogita–Oishi 2008 Part I/II).
@@ -222,37 +223,38 @@ func prevFloat[T: SomeFloat](x: T): T =
       return cast[float32](0x8000_0001'u32)
     return cast[float32](b - 1'u32)
 
-func extractVector[T: SomeFloat](sigma: T, p: openArray[T]): tuple[
-    tau: T, pPrime: seq[T]] =
+func extractVector[T: SomeFloat](sigma: T, pCur, pNext: var seq[T]): T =
   ## Rump `ExtractVector` (Part I, Alg 3.4): with `sigma` a power of two `>=
   ## 2^M·max|p_i|`, splits each `p_i` into a high part `q_i` (absorbed into the
-  ## running `tau`) and a residual `p'_i = p_i - q_i`, so `p_i = q_i + p'_i`
-  ## exactly and `sum(p) = tau + sum(p')`. The high parts need not be stored.
-  result.tau = T(0)
-  result.pPrime = newSeq[T](p.len)
-  for i in 0 ..< p.len:
-    let qi = (sigma + p[i]) - sigma
-    result.pPrime[i] = p[i] - qi
-    result.tau = result.tau + qi
+  ## returned `tau`) and a residual `p'_i = p_i - q_i` written into `pNext`, so
+  ## `p_i = q_i + p'_i` exactly and `sum(p) = tau + sum(pNext)`. `pNext` is
+  ## pre-allocated by the caller with `pCur.len` slots and overwritten in place.
+  result = T(0)
+  for i in 0 ..< pCur.len:
+    let qi = (sigma + pCur[i]) - sigma
+    pNext[i] = pCur[i] - qi
+    result = result + qi
 
-func rumpTransform[T: SomeFloat](p: openArray[T]): tuple[tau1: T, tau2: T,
-    pPrime: seq[T]] =
+func rumpTransform[T: SomeFloat](p: openArray[T],
+    pPrime: var seq[T]): tuple[tau1: T, tau2: T] =
   ## Rump `Transform` (Part I, Alg 4.1/4.4): the faithful error-free transform.
-  ## Produces `(tau1, tau2)` (a `FastTwoSum` split of the high-order sum) and a
-  ## residual vector `pPrime` with `sum(p) = tau1 + tau2 + sum(pPrime)` exactly
-  ## in real arithmetic, `max|pPrime| <= eps·sigma`. `M = ceil(log2(n+2))`;
+  ## Produces `(tau1, tau2)` (a `FastTwoSum` split of the high-order sum) and,
+  ## through `pPrime`, a residual vector with `sum(p) = tau1 + tau2 + sum(pPrime)`
+  ## exactly in real arithmetic, `max|pPrime| <= eps·sigma`. `M = ceil(log2(n+2))`;
   ## `eps` is the machine epsilon. The repeat-until shrinks `sigma` by
   ## `2^M·eps` until the accumulated high part `t` dominates the residual.
   let n = p.len
   if n == 0:
-    return (T(0), T(0), newSeq[T](0))
+    pPrime = newSeq[T](0)
+    return (T(0), T(0))
   var mu = T(0)
   for v in p:
     let a = abs(v)
     if a > mu:
       mu = a
   if mu == T(0):
-    return (T(0), T(0), newSeq[T](n))
+    pPrime = newSeq[T](n)
+    return (T(0), T(0))
   when T is float64:
     const eps = cast[float64](0x3CB0_0000_0000_0000'u64) # 2^-52 (machine epsilon)
     const eta = cast[float64](1'u64) # 2^-1074 (smallest subnormal)
@@ -264,7 +266,8 @@ func rumpTransform[T: SomeFloat](p: openArray[T]): tuple[tau1: T, tau2: T,
                                                           # sigma0 overflows only when mu is near the top of the range, i.e. the sum
                                                           # itself overflows; the caller falls back to the superaccumulator in that case.
   if not isFin(sigma0):
-    return (T(Inf), T(0), newSeq[T](0))
+    pPrime = newSeq[T](0)
+    return (T(Inf), T(0))
   let sigmaFloor = T(0.5) * (T(1) / eps) * eta # 0.5·eps^-1·eta (subnormal stop)
   var sigma = sigma0
   var t = T(0)
@@ -273,32 +276,44 @@ func rumpTransform[T: SomeFloat](p: openArray[T]): tuple[tau1: T, tau2: T,
   var pCur = newSeq[T](n)
   for i in 0 ..< n:
     pCur[i] = p[i]
-  var pFinal: seq[T]
+  var pNext = newSeq[T](n)
   while true:
-    let (tau, pNext) = extractVector(sigma, pCur)
+    tauLast = extractVector(sigma, pCur, pNext)
     tPrev = t
-    t = t + tau
-    tauLast = tau
+    t = t + tauLast
     let thresh = pow2i[T](2 * m) * eps * sigma         # 2^(2M)·eps·sigma
     if abs(t) >= thresh or sigma <= sigmaFloor:
-      pFinal = pNext
+      pPrime = pNext
       break
     sigma = sigma * pow2i[T](m) * eps # sigma_m = 2^M·eps·sigma_{m-1}
-    pCur = pNext
+    swap(pCur, pNext) # reuse the two buffers, no per-iteration allocation
   # An overflow during accumulation (t -> Inf) breaks the error-free property;
   # signal it so the caller falls back to the superaccumulator.
   if not isFin(t):
-    return (T(Inf), T(0), newSeq[T](0))
+    pPrime = newSeq[T](0)
+    return (T(Inf), T(0))
   # (tau1, tau2) = FastTwoSum(t^{m-1}, tau^{m}); twoSum is value-identical and
   # needs no |a| >= |b| precondition (the operands are finite: bounded by sigma0).
-  let (tau1, tau2) = twoSum(tPrev, tauLast)
-  result = (tau1, tau2, pFinal)
+  twoSum(tPrev, tauLast)
+
+func prepend[T: SomeFloat](head: T, tail: openArray[T]): seq[T] =
+  ## `[head, tail[0], tail[1], ...]` as a fresh seq. Used by `nearSum` to feed
+  ## the midpoint-offset residual into a second faithful sum. Hand-written
+  ## rather than `sequtils.concat(@[head], tail)` so a single `seq[T]` type
+  ## flows through (the Nim ARC codegen can mint two distinct C types for the
+  ## literal and the residual under `--mm:arc`, which `concat`'s
+  ## `openArray[seq[T]]` then cannot hold).
+  result = newSeq[T](tail.len + 1)
+  result[0] = head
+  for i in 0 ..< tail.len:
+    result[i + 1] = tail[i]
 
 func faithfulSum[T: SomeFloat](x: openArray[T]): T =
   ## Rump `AccSum` core (Part I, Alg 4.5): `tau1 + (tau2 + sum(pPrime))`, the
   ## faithful rounding of `sum(x)`. Assumes finite `x` with a non-overflowing
   ## `sigma0` — the public `accSum` guards both and falls back otherwise.
-  let (tau1, tau2, pPrime) = rumpTransform(x)
+  var pPrime: seq[T]
+  let (tau1, tau2) = rumpTransform(x, pPrime)
   if not isFin(tau1):
     return T(Inf) # sentinel for the sigma0-overflow path
   result = tau1 + (tau2 + naiveSum(pPrime))
@@ -321,7 +336,8 @@ func accSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
       return T(0)
     if not allFin(x):
       return superSum(x)
-    let (tau1, tau2, pPrime) = rumpTransform(x)
+    var pPrime: seq[T]
+    let (tau1, tau2) = rumpTransform(x, pPrime)
     if not isFin(tau1): # sigma0-overflow or mid-accumulation overflow
       return superSum(x)
     result = tau1 + (tau2 + naiveSum(pPrime))
@@ -343,7 +359,8 @@ func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
       return T(0)
     if not allFin(x):
       return superSum(x)
-    let (tau1, tau2, pPrime) = rumpTransform(x)
+    var pPrime: seq[T]
+    let (tau1, tau2) = rumpTransform(x, pPrime)
     if not isFin(tau1): # sigma0-overflow → exact fallback
       return superSum(x)
     when T is float64:
@@ -360,7 +377,7 @@ func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
       if gamma == -eta:
         return res # no predecessor in F (res at the negative exponent floor)
       let dp = gamma / T(2) # midpoint toward pred(res)
-      let d2 = faithfulSum(concat(@[r - dp], pPrime)) # sign of s - midpoint
+      let d2 = faithfulSum(prepend(r - dp, pPrime)) # sign of s - midpoint
       if d2 > T(0):
         return res
       elif d2 < T(0):
@@ -372,7 +389,7 @@ func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
       if gamma == eta:
         return res
       let dp = gamma / T(2)
-      let d2 = faithfulSum(concat(@[r - dp], pPrime))
+      let d2 = faithfulSum(prepend(r - dp, pPrime))
       if d2 > T(0):
         return nextFloat(res)
       elif d2 < T(0):
