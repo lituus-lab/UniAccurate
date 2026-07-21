@@ -21,6 +21,7 @@
 ## product, so the layer uses no FMA at all. nimsimd is imported inside the ISA
 ## branches only, so a scalar build (no `-d:simd`) never pulls it.
 when defined(simd):
+  import contracts
   import ./algorithms/naivesum
   import ./algorithms/pairwisesum
   import ./algorithms/compensatedsum
@@ -122,15 +123,18 @@ when defined(simd):
       for j in 0 ..< L: result += lanes[j]
       while i < n: result += x[i]; inc i
 
-  func naiveSumSimd*[T: SomeFloat](x: openArray[T]): T =
-    when T is float64 and defined(avx512):
-      naiveSumSimdAvx512(x)
-    elif T is float64 and defined(avx2):
-      naiveSumSimdAvx2(x)
-    elif T is float32 and defined(arm64):
-      naiveSumSimdNeonF32(x)
-    else:
-      naiveSum(x)
+  func naiveSumSimd*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+    ensure:
+      x.len != 0 or result == T(0)
+    body:
+      when T is float64 and defined(avx512):
+        result = naiveSumSimdAvx512(x)
+      elif T is float64 and defined(avx2):
+        result = naiveSumSimdAvx2(x)
+      elif T is float32 and defined(arm64):
+        result = naiveSumSimdNeonF32(x)
+      else:
+        result = naiveSum(x)
 
   func pairwiseSimdRec[T: SomeFloat](x: openArray[T], lo, hi: int): T =
     let n = hi - lo + 1
@@ -139,34 +143,47 @@ when defined(simd):
     let m = lo + n div 2
     result = pairwiseSimdRec(x, lo, m - 1) + pairwiseSimdRec(x, m, hi)
 
-  func pairwiseSumSimd*[T: SomeFloat](x: openArray[T]): T =
-    when (T is float64 and (defined(avx2) or defined(avx512))) or
-         (T is float32 and defined(arm64)):
-      if x.len == 0: return T(0)
-      pairwiseSimdRec(x, 0, x.high)
-    else:
-      pairwiseSum(x)
+  func pairwiseSumSimd*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+    ensure:
+      x.len != 0 or result == T(0)
+    body:
+      when (T is float64 and (defined(avx2) or defined(avx512))) or
+           (T is float32 and defined(arm64)):
+        if x.len == 0: return T(0)
+        result = pairwiseSimdRec(x, 0, x.high)
+      else:
+        result = pairwiseSum(x)
 
-  func kahanSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) =
-    when T is float64 and defined(avx512):
-      kahanSumSimdAvx512(x)
-    elif T is float64 and defined(avx2):
-      kahanSumSimdAvx2(x)
-    else:
-      (kahanSum(x), true)
+  func kahanSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) {.contractual.} =
+    ensure:
+      x.len != 0 or (result[0] == T(0) and result[1])
+    body:
+      when T is float64 and defined(avx512):
+        result = kahanSumSimdAvx512(x)
+      elif T is float64 and defined(avx2):
+        result = kahanSumSimdAvx2(x)
+      else:
+        result = (kahanSum(x), true)
 
-  func neumaierSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) =
-    when T is float64 and defined(avx512):
-      neumaierSumSimdAvx512(x)
-    elif T is float64 and defined(avx2):
-      neumaierSumSimdAvx2(x)
-    else:
-      (neumaierSum(x), true)
+  func neumaierSumSimd*[T: SomeFloat](x: openArray[T]): (T,
+      bool) {.contractual.} =
+    ensure:
+      x.len != 0 or (result[0] == T(0) and result[1])
+    body:
+      when T is float64 and defined(avx512):
+        result = neumaierSumSimdAvx512(x)
+      elif T is float64 and defined(avx2):
+        result = neumaierSumSimdAvx2(x)
+      else:
+        result = (neumaierSum(x), true)
 
-  func kleinSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) =
-    when T is float64 and defined(avx512):
-      kleinSumSimdAvx512(x)
-    elif T is float64 and defined(avx2):
-      kleinSumSimdAvx2(x)
-    else:
-      (kleinSum(x), true)
+  func kleinSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) {.contractual.} =
+    ensure:
+      x.len != 0 or (result[0] == T(0) and result[1])
+    body:
+      when T is float64 and defined(avx512):
+        result = kleinSumSimdAvx512(x)
+      elif T is float64 and defined(avx2):
+        result = kleinSumSimdAvx2(x)
+      else:
+        result = (kleinSum(x), true)
