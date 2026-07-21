@@ -114,7 +114,9 @@ template dotSuite(T: typedesc) =
       let y = [T(1.0), T(1.0), T(1.0), T(1.0), T(1.0), T(1.0), T(1.0)]
       let refn = superDot(x, y)
       check withinRel(dot2(x, y), refn, T(1e-6))
-      check dot2(x, y) == refn or naiveDot(x, y) != refn # dot2 no worse than naive
+      # dot2 is no farther from the exact dot than naiveDot (its bound is below
+      # naiveDot's on the same data): compare the absolute errors directly.
+      check abs(dot2(x, y) - refn) <= abs(naiveDot(x, y) - refn)
 
     test "dotK: K=1 is naiveDot (integer-exact)":
       let x = [T(1.0), T(2.0), T(3.0)]
