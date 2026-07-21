@@ -8,6 +8,7 @@ import UniAccurate/algorithms/compensatedsum
 import UniAccurate/algorithms/shewchuksum
 import UniAccurate/algorithms/exactsum
 import UniAccurate/algorithms/orosum
+import UniAccurate/algorithms/dotproduct
 export twosum
 export naivesum
 export pairwisesum
@@ -15,6 +16,7 @@ export compensatedsum
 export shewchuksum
 export exactsum
 export orosum
+export dotproduct
 when defined(simd):
   import UniAccurate/simd
   export simd
