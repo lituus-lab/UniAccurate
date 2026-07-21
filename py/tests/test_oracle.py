@@ -140,7 +140,7 @@ DOT_ALGS = [
 # Precompute the exact dot oracle (S, E) once per dot case.
 DOT_ORACLE = [
     (label, xs, ys, exact_dot(xs, ys),
-     sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys)))
+     sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys, strict=True)))
     for label, xs, ys in DOT_CASES
 ]
 
