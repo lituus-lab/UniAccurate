@@ -55,7 +55,10 @@ Three tiers, each catching what the others cannot:
 - C symbols `ua_*`; lib `libUniAccurate`; header `UniAccurate.h`.
 - SIMD layer (`-d:simd`, ADR-0005): dispatch at the umbrella and C ABI, never in
   `algorithms/` (vgraph back-edge). Compensated SIMD returns `(T, bool)`; the C
-  ABI falls back to the scalar algorithm when `reliable = false`. No FMA in v1.
+  ABI falls back to the scalar algorithm when `reliable = false`. FMA is used
+  only in the dot product — the scalar `twoProductFMA` product split and the
+  SIMD dot kernels' FMA intrinsics; the compensated sum recurrence stays
+  FMA-free (ADR-0005).
 - `book/index.nim` is nimib: its code blocks are compiled and run at docs build,
   so prose that outlives its API breaks the build. `py/notebooks/quickstart.ipynb`
   plays the same role for Python and renders natively on GitHub.
