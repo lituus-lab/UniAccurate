@@ -49,6 +49,9 @@ task shewchuk, "Shewchuk summation tests (debug, contracts active)":
 task exact, "Exact superaccumulator tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_exact tests/test_exactsum.nim"
 
+task oro, "ORO/Rump summation tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_oro tests/test_orosum.nim"
+
 task prop, "Randomized property tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_prop tests/test_property.nim"
 
@@ -58,6 +61,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nimble comp"
   exec "nimble shewchuk"
   exec "nimble exact"
+  exec "nimble oro"
   exec "nimble prop"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
@@ -67,6 +71,7 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
@@ -75,6 +80,7 @@ task testCi, "Nim tests (CI subset, debug)":
   exec "nimble comp"
   exec "nimble shewchuk"
   exec "nimble exact"
+  exec "nimble oro"
   exec "nimble prop"
 
 task testCiRelease, "Nim tests (CI subset, release)":
@@ -84,6 +90,7 @@ task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testAll, "debug + release + C ABI":

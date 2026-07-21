@@ -67,6 +67,10 @@ suite "finite inputs never yield NaN (no overflow)":
       check classify(kleinSum(x)) != fcNan
       check classify(shewchukSum(x)) != fcNan
       check classify(superSum(x)) != fcNan
+      check classify(sum2(x)) != fcNan
+      check classify(sumK(x, 2)) != fcNan
+      check classify(accSum(x)) != fcNan
+      check classify(nearSum(x)) != fcNan
 
 suite "finite inputs never yield NaN (overflow-prone)":
   # Naive and the compensated sums carry the per-step `isFin` guard (or, for
@@ -86,6 +90,13 @@ suite "finite inputs never yield NaN (overflow-prone)":
       check classify(kleinSum(x)) != fcNan
       check classify(shewchukSum(x)) != fcNan
       check classify(superSum(x)) != fcNan
+      # The Rump family falls back to `superSum` on non-finite/overflow input,
+      # so it inherits the same finite-never-NaN property (correctly rounded,
+      # stronger than faithful).
+      check classify(sum2(x)) != fcNan
+      check classify(sumK(x, 2)) != fcNan
+      check classify(accSum(x)) != fcNan
+      check classify(nearSum(x)) != fcNan
 
 suite "exact integer data agrees across all sums":
   var r = Seed xor 2
@@ -102,6 +113,15 @@ suite "exact integer data agrees across all sums":
       check kleinSum(x) == want
       check shewchukSum(x) == want
       check superSum(x) == want
+      # Integer-valued data sums exactly at every precision, so the ORO/Rump
+      # family (compensated, faithful, correctly rounded) all hit the exact
+      # integer — `sumK` at K=1..3, `accSum` faithful, `nearSum` rounded.
+      check sum2(x) == want
+      check sumK(x, 1) == want
+      check sumK(x, 2) == want
+      check sumK(x, 3) == want
+      check accSum(x) == want
+      check nearSum(x) == want
 
 suite "float32 compensated finite never NaN":
   var r = Seed xor 3
@@ -115,3 +135,7 @@ suite "float32 compensated finite never NaN":
       check classify(kleinSum(x)) != fcNan
       check classify(shewchukSum(x)) != fcNan
       check classify(superSum(x)) != fcNan
+      check classify(sum2(x)) != fcNan
+      check classify(sumK(x, 2)) != fcNan
+      check classify(accSum(x)) != fcNan
+      check classify(nearSum(x)) != fcNan
