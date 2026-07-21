@@ -244,6 +244,53 @@ algorithm (documented in ADR-0007).
 """
 
 nbText: """
+## Exact summation (the small superaccumulator)
+
+`shewchuckSum` rounds once, but its expansion is still float-precision: an
+addend too small to land in any expansion slot is lost. `superSum` drops that
+ceiling by accumulating in an *exact integer* superaccumulator (Neal's small
+superaccumulator): each addend is split into its exponent chunk and added into
+a fixed array of `int64` bins covering the whole float range, carries deferred
+lazily, and a single final round produces the float result. The integer sum is
+exact, commutative, and associative, so the final rounding is order-invariant
+and the error is again `½ ulp(fl(Σ xᵢ))` — but now no addend is ever lost to
+the working precision, and opposite-sign overflow cancels exactly instead of
+yielding `+Inf + −Inf = NaN`.
+
+`superDot` reuses the same accumulator with a 64×64→128 product step, so the
+dot product `Σ xᵢyᵢ` is held at its true magnitude even when an individual
+product overflows the float range — the finite-input NaN fallback the dot
+family relies on.
+
+    superSum:  ½ ulp(fl(Σ xᵢ))      order-invariant, exact integer accumulation
+    superDot:  ½ ulp(fl(Σ xᵢyᵢ))    products held at true magnitude
+
+Both fall back to IEEE propagation on a non-finite addend or a genuine overflow
+past the accumulator's range (finite inputs never yield NaN). There is no SIMD
+kernel — the integer chunk sweep does not vectorize — so under `-d:simd` the C
+ABI dispatches to the scalar algorithm (ADR-0007).
+"""
+
+nbCode:
+  let bigCancel = [1.0, 1e100, 1.0, -1e100]
+  echo "superSum (magnitude) = ", superSum(bigCancel)
+  echo "shewchuckSum         = ", shewchuckSum(bigCancel)
+  let dotX = [1.0, 2.0, 3.0]
+  let dotY = [4.0, 5.0, 6.0]
+  echo "superDot             = ", superDot(dotX, dotY)
+
+nbText: """
+The C ABI exposes `ua_sum_exact` / `ua_dot_exact` and Python exposes
+`exact_sum` / `exact_dot`.
+
+### References
+
+- Neal, R. (2015). "Fast Exact Summation Using Small and Large
+  Superaccumulators". arXiv:1505.05571 — the small superaccumulator layout,
+  lazy carry, and 64×64→128 product accumulation.
+"""
+
+nbText: """
 ## The C ABI
 
 The same entry point, reachable from anything that speaks C. The header is

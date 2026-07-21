@@ -25,9 +25,10 @@ Three tiers, each catching what the others cannot:
 
 - **Structural tests** (`tests/test_*.nim`, `nimble test`): debug builds with
   contracts active. `test_eft`, `test_naivesum`, `test_pairwisesum`,
-  `test_compensatedsum`, `test_shewchuksum` lock exact behavior — empty/single
-  inputs, the compensation win on `0.1·10`, magnitude-robustness, non-finite
-  propagation, and the `s + e == a op b` identity to the last bit.
+  `test_compensatedsum`, `test_shewchuksum`, `test_exactsum` lock exact
+  behavior — empty/single inputs, the compensation win on `0.1·10`,
+  magnitude-robustness, non-finite propagation, and the `s + e == a op b`
+  identity to the last bit.
 - **Randomized property tests** (`tests/test_property.nim`, `nimble prop`):
   oracle-free invariants at scale on the native path — finite inputs never
   yield NaN (bounded and overflow-prone, float64 and float32), and every sum
