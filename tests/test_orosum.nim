@@ -135,6 +135,48 @@ template oroSuite(T: typedesc) =
       let m = maxFin(T)
       check classify(sumK([m, m, m], 2)) == fcInf
 
+    test "sumK: useFastTwoSum is bit-identical to the default (the EFT swap)":
+      # twoSumFast yields the same (s, e) as twoSum, so the cascaded transform is
+      # bit-identical — checked on integer-exact, 0.1×10, magnitude-robust, and
+      # mixed-magnitude random data, for K in {1, 2, 3}.
+      let ints = [T(1.0), T(2.0), T(3.0), T(4.0), T(5.0), T(6.0)]
+      let tenths = [T(0.1), T(0.1), T(0.1), T(0.1), T(0.1),
+                    T(0.1), T(0.1), T(0.1), T(0.1), T(0.1)]
+      let mag = [T(1.0), T(1e20), T(1.0), T(-1e20), T(3.0), T(-3.0)]
+      var r = 0x5EED'u64
+      for K in 1 .. 3:
+        check sumK(ints, K, useFastTwoSum = true) == sumK(ints, K)
+        check sumK(tenths, K, useFastTwoSum = true) == sumK(tenths, K)
+        check sumK(mag, K, useFastTwoSum = true) == sumK(mag, K)
+      for n in [10, 100, 1000]:
+        let x = mixedMag(T, r, n)
+        for K in 1 .. 3:
+          check sumK(x, K, useFastTwoSum = true) == sumK(x, K)
+
+    test "sumK: assumeFinite is bit-identical on finite non-overflowing input":
+      # The opt-in strips transform's per-step `isFin` guard and the cascade's
+      # `isFin(result)` guard; neither fires on finite non-overflowing data, so
+      # the cascade is bit-for-bit identical. Checked with and without
+      # useFastTwoSum (the two levers compose independently). Bounded data only
+      # — the opt-in's overflow output is undefined (a `twoSum(Inf, ·)`
+      # precondition violation in debug), so `mixedMag` (which can overflow) is
+      # not exercised here; `useFastTwoSum`'s own parity test covers that data.
+      let ints = [T(1.0), T(2.0), T(3.0), T(4.0), T(5.0), T(6.0)]
+      let tenths = [T(0.1), T(0.1), T(0.1), T(0.1), T(0.1),
+                    T(0.1), T(0.1), T(0.1), T(0.1), T(0.1)]
+      let mag = [T(1.0), T(1e20), T(1.0), T(-1e20), T(3.0), T(-3.0)]
+      for K in 1 .. 3:
+        check sumK(ints, K, assumeFinite = true) == sumK(ints, K)
+        check sumK(tenths, K, assumeFinite = true) == sumK(tenths, K)
+        check sumK(mag, K, assumeFinite = true) == sumK(mag, K)
+        check sumK(ints, K, useFastTwoSum = true, assumeFinite = true) ==
+          sumK(ints, K)
+
+    test "sum2: assumeFinite is bit-identical to the default":
+      let mag = [T(1.0), T(1e20), T(1.0), T(-1e20)]
+      check sum2(mag, assumeFinite = true) == sum2(mag)
+      check sum2(mag, assumeFinite = true) == T(2.0)
+
     test "accSum: empty and single":
       let e: seq[T] = @[]
       check accSum(e) == T(0.0)

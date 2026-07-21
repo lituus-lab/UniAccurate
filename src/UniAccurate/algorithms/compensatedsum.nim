@@ -13,8 +13,9 @@
 ##     space). Faithful to Kahan's original form: the compensation `c` is folded
 ##     into the next addend at each step (`y = v - c`), with no final `+ c`.
 ##   * `neumaierSum` — Kahan-Babuška-Neumaier, the magnitude-robust variant
-##     (7 FLOPs/term); built on `twoSum`. Recommended for general-purpose
-##     summation of unsorted data.
+##     (7 FLOPs/term); built on `twoSum` (Neumaier's branched form under
+##     `assumeFinite`). Recommended for general-purpose summation of unsorted
+##     data.
 ##   * `kleinSum` — Klein's two-level scheme (13 FLOPs/term), ~ε² accuracy;
 ##     built on two nested `twoSum` passes.
 ##
@@ -80,7 +81,8 @@ import std/math
 import contracts
 import ../twosum
 
-func kahanSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+func kahanSum*[T: SomeFloat](x: openArray[T],
+    assumeFinite: static bool = false): T {.contractual.} =
   ## Kahan (1965) compensated summation: tracks the rounding error of each `+`
   ## in a running compensation `c` and subtracts it from the next addend,
   ## recovering the lost low-order bits. 4 FLOPs/term, O(1) space.
@@ -89,14 +91,26 @@ func kahanSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## step via `y = v - c`; no final `+ c`). For inputs where a later addend
   ## dominates the running sum, a magnitude-robust variant does better.
   ##
+  ## `assumeFinite = true` (opt-in) drops the per-element `isFin` guard that
+  ## diverts a non-finite operand or partial sum to naive IEEE propagation — the
+  ## caller contracts (via `require:`, checked under `-d:contracts`) that every
+  ## element is finite **and** no partial sum overflows, so the compensation
+  ## recurrence runs bare. Bit-identical to the default on finite
+  ## non-overflowing input (the guard never fires there); NaN/±Inf inputs or an
+  ## intermediate overflow then produce undefined garbage instead of naive
+  ## propagation. The default (`false`) keeps the guard and is safe.
+  ##
   ## Example:
   ##
   ## .. code-block:: nim
   ##   let s = kahanSum([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
   ##   doAssert s == 1.0
+  require:
+    not assumeFinite or allFin(x) # opt-in ⇒ finite input
   ensure:
     x.len != 0 or result == T(0)
-    not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
+    assumeFinite or (not allFin(x) or classify(result) !=
+        fcNan) # finite ⇒ no NaN (guard path only)
   body:
     if x.len == 0:
       return T(0)
@@ -104,32 +118,60 @@ func kahanSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     var c = T(0)
     for i in 1 ..< x.len:
       let v = x[i]
-      if not isFin(result) or not isFin(v):
-        result = result + v # EFT lost; naive IEEE propagation
-        continue
+      when not assumeFinite:
+        if not isFin(result) or not isFin(v):
+          result = result + v # EFT lost; naive IEEE propagation
+          continue
       let y = v - c # addend corrected by the prior step's error
       let t = result + y
       c = (t - result) - y # algebraically 0; captures this step's error
       result = t
 
-func neumaierSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+func neumaierSum*[T: SomeFloat](x: openArray[T],
+    assumeFinite: static bool = false): T {.contractual.} =
   ## Kahan-Babuška-Neumaier summation: the magnitude-robust compensated sum.
-  ## Each step is an error-free addition `twoSum(result, v)` whose error is
-  ## accumulated into `c` and added once at the end. 7 FLOPs/term, O(1) space.
+  ## Each step is an error-free addition of `v` into the running `result` whose
+  ## error is accumulated into `c` and added once at the end. 7 FLOPs/term,
+  ## O(1) space.
   ##
-  ## Equivalent to Neumaier's magnitude-branched form (the branchless `twoSum`
-  ## handles both operand orderings), expressed through the EFT. Recommended for
-  ## general-purpose summation of unsorted data: where Kahan loses a small
-  ## addend dominated by the running sum, `neumaierSum` recovers it.
+  ## Two EFT shapes, selected by `assumeFinite` (bit-identical to each other):
+  ##
+  ##   * default (`false`) — branchless `twoSum(result, v)`. The branchless form
+  ##     is robust to cancellation data, where a magnitude branch on `|result|`
+  ##     vs `|v|` mispredicts as the running sum flips sign. The per-step `isFin`
+  ##     guard's control flow also stops the compiler folding a magnitude branch
+  ##     to branchless, so the branched form would regress ~45% on cancellation
+  ##     here; `twoSum` keeps the guarded path steady across every input shape.
+  ##   * `assumeFinite = true` — Neumaier's magnitude-branched form (`t =
+  ##     result + v`; `c += (result - t) + v` or `(v - t) + result`). With the
+  ##     guard gone the compiler folds the magnitude select to branchless code,
+  ##     matching the C reference across every input shape (incl. cancellation)
+  ##     at ~0.94 ns/elem, ~20% faster than the `twoSum` form.
+  ##
+  ## `assumeFinite = true` (opt-in) drops the per-element `isFin` guard and the
+  ## final `isFin(result)` compensation guard — the caller contracts that every
+  ## element is finite **and** no partial sum overflows, so the EFT recurrence
+  ## runs bare and the compensation is always applied. Bit-identical to the
+  ## default on finite non-overflowing input; NaN/±Inf inputs or an intermediate
+  ## overflow then produce undefined garbage (an `Inf − Inf = NaN` in the error
+  ## recovery) instead of the guarded ±Inf result. See `kahanSum` for the
+  ## contract shape; the default (`false`) keeps both guards and is safe.
+  ##
+  ## Recommended for general-purpose summation of unsorted data: where Kahan
+  ## loses a small addend dominated by the running sum, `neumaierSum` recovers
+  ## it.
   ##
   ## Example:
   ##
   ## .. code-block:: nim
   ##   let s = neumaierSum([1.0, 1e100, 1.0, -1e100])
   ##   doAssert s == 2.0
+  require:
+    not assumeFinite or allFin(x) # opt-in ⇒ finite input
   ensure:
     x.len != 0 or result == T(0)
-    not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
+    assumeFinite or (not allFin(x) or classify(result) !=
+        fcNan) # finite ⇒ no NaN (guard path only)
   body:
     if x.len == 0:
       return T(0)
@@ -137,19 +179,39 @@ func neumaierSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     var c = T(0)
     for i in 1 ..< x.len:
       let v = x[i]
-      if not isFin(result) or not isFin(v):
-        result = result + v # EFT lost; naive IEEE propagation
-        continue
-      let (t, e) = twoSum(result, v)
-      result = t
-      c += e
+      when not assumeFinite:
+        # Guarded default: branchless twoSum. The guard's control flow (the
+        # `continue` divert) stops the compiler folding a magnitude branch to
+        # branchless, and a predicted magnitude branch mispredicts on
+        # cancellation data; twoSum is branchless and stays steady either way.
+        if not isFin(result) or not isFin(v):
+          result = result + v # EFT lost; naive IEEE propagation
+          continue
+        let (t, e) = twoSum(result, v)
+        result = t
+        c += e
+      else:
+        # Opt-in bare path: Neumaier's magnitude-branched form — the C
+        # reference's exact shape. With no guard the compiler folds the
+        # magnitude select to branchless code, matching C on every input shape.
+        let t = result + v
+        if abs(result) >= abs(v):
+          c += (result - t) + v
+        else:
+          c += (v - t) + result
+        result = t
     # Once the running sum overflowed to ±Inf the per-step error `c` is NaN
     # (recovered from Inf - Inf); adding it would corrupt the Inf into NaN,
-    # so apply the compensation only for a finite running sum.
-    if isFin(result):
+    # so apply the compensation only for a finite running sum. The opt-in path
+    # skips this guard (the caller promises no overflow) and always adds `c`.
+    when assumeFinite:
       result += c
+    else:
+      if isFin(result):
+        result += c
 
-func kleinSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+func kleinSum*[T: SomeFloat](x: openArray[T],
+    assumeFinite: static bool = false): T {.contractual.} =
   ## Klein (2006) two-level compensated summation: a second `twoSum` pass
   ## compensates the first-order error stream, reaching ~ε² accuracy.
   ## ~13 FLOPs/term, O(1) space.
@@ -159,14 +221,26 @@ func kleinSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## whose own error accumulates into `ccs`. The final result adds both
   ## compensation streams.
   ##
+  ## `assumeFinite = true` (opt-in) drops the per-element `isFin` guard, the
+  ## `isFin(t)` second-level guard, and the final `isFin(result)` guard — the
+  ## caller contracts that every element is finite **and** no partial sum
+  ## overflows, so both `twoSum` passes run bare and the compensation is always
+  ## applied. Bit-identical to the default on finite non-overflowing input; an
+  ## intermediate overflow then feeds a NaN error into the second-level EFT
+  ## (undefined garbage) instead of the guarded ±Inf result. See `kahanSum` for
+  ## the contract shape; the default (`false`) keeps the guards and is safe.
+  ##
   ## Example:
   ##
   ## .. code-block:: nim
   ##   let s = kleinSum([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
   ##   doAssert s == 1.0
+  require:
+    not assumeFinite or allFin(x) # opt-in ⇒ finite input
   ensure:
     x.len != 0 or result == T(0)
-    not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
+    assumeFinite or (not allFin(x) or classify(result) !=
+        fcNan) # finite ⇒ no NaN (guard path only)
   body:
     if x.len == 0:
       return T(0)
@@ -175,18 +249,24 @@ func kleinSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     var ccs = T(0) # second-order compensation stream
     for i in 1 ..< x.len:
       let v = x[i]
-      if not isFin(result) or not isFin(v):
-        result = result + v # EFT lost; naive IEEE propagation
-        continue
+      when not assumeFinite:
+        if not isFin(result) or not isFin(v):
+          result = result + v # EFT lost; naive IEEE propagation
+          continue
       let (t, c) = twoSum(result, v)
       result = t
       # When `t` overflows, `c` is NaN (Inf-Inf recovery); feeding it to the
       # second-level `twoSum` would violate its finite-operand precondition.
       # Skip the second level for that step and let the running sum propagate.
-      if not isFin(t):
-        continue
+      # The opt-in path drops this guard (the caller promises no overflow).
+      when not assumeFinite:
+        if not isFin(t):
+          continue
       let (t2, cc) = twoSum(cs, c)
       cs = t2
       ccs += cc
-    if isFin(result):
+    when assumeFinite:
       result = result + cs + ccs
+    else:
+      if isFin(result):
+        result = result + cs + ccs

@@ -68,7 +68,9 @@ import compensatedsum
 import naivesum
 import exactsum
 
-func transform[T: SomeFloat](x: openArray[T], err: var seq[T]): T =
+func transform[T: SomeFloat](x: openArray[T], err: var seq[T],
+    useFastTwoSum: static bool = false,
+    assumeFinite: static bool = false): T =
   ## ORO Vecsum (Alg 4.6): error-free transform of a sum. Chains `twoSum`
   ## across `x` so that `result + sum(err) == sum(x)` exactly in real arithmetic,
   ## with `result = fl(Σ xᵢ)` the naive sum and `err` (written through the out-
@@ -76,6 +78,20 @@ func transform[T: SomeFloat](x: openArray[T], err: var seq[T]): T =
   ## naive IEEE propagation (the EFT is lost, the error slot is set to 0); a step
   ## whose sum overflows produces a NaN error, which the cascade's `isFin` guard
   ## localizes.
+  ##
+  ## `useFastTwoSum` swaps the per-step `twoSum` (6 branchless FLOPs) for the
+  ## branched `twoSumFast` (3 FLOPs + 1 magnitude branch). Both yield the same
+  ## `(s, e)` EFT, so the transform is bit-identical either way — a throughput
+  ## lever, not an accuracy one. The branch is well-predicted when the running
+  ## `result` dominates its addends (the common cascade shape), and a loss where
+  ## `|result|` vs `|x[i]|` flips often (cancellation data with comparable
+  ## addends); the flag lets `sumK` pick per workload.
+  ##
+  ## `assumeFinite` drops the per-step `isFin` guard (the naive-propagation
+  ## divert). Bit-identical to the guarded path on finite non-overflowing input
+  ## (the guard never fires there); an overflow then seeds `err` with a NaN from
+  ## the EFT recovery instead of a 0 — the caller contracts no overflow. See
+  ## `kahanSum` for the contract shape.
   let n = x.len
   if n == 0:
     err.setLen(0)
@@ -85,15 +101,18 @@ func transform[T: SomeFloat](x: openArray[T], err: var seq[T]): T =
                     # lengths strictly decrease, so this never reallocates in the
                     # cascade steady state (cap is already large enough).
   for i in 1 ..< n:
-    if not isFin(result) or not isFin(x[i]):
-      result = result + x[i]
-      err[i - 1] = T(0)
-    else:
-      let (s, e) = twoSum(result, x[i])
-      result = s
-      err[i - 1] = e
+    when not assumeFinite:
+      if not isFin(result) or not isFin(x[i]):
+        result = result + x[i]
+        err[i - 1] = T(0)
+        continue
+    let (s, e) = when useFastTwoSum: twoSumFast(result, x[i])
+                 else: twoSum(result, x[i])
+    result = s
+    err[i - 1] = e
 
-func sum2*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+func sum2*[T: SomeFloat](x: openArray[T],
+    assumeFinite: static bool = false): T {.contractual.} =
   ## ORO `sum2` (Alg 4.1) — the magnitude-robust compensated sum. Identical in
   ## value to `neumaierSum`: the ORO Vecsum-with-final-correction is Neumaier's
   ## scheme. Exposed under the ORO name for API symmetry with `sumK`.
@@ -101,13 +120,23 @@ func sum2*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Forward bound: `|fl(sum2) - Σxᵢ| <= (2u + O(nu²)) · Σ|xᵢ|`. See `neumaierSum`
   ## for the magnitude-robustness discussion (recovers a small addend dominated
   ## by the running sum where `kahanSum` loses it).
+  ##
+  ## `assumeFinite` threads straight into `neumaierSum` (this is its ORO alias):
+  ## the per-element and final `isFin` guards are dropped on the opt-in path.
+  ## Bit-identical to the default on finite non-overflowing input. See
+  ## `neumaierSum` / `kahanSum` for the contract shape.
+  require:
+    not assumeFinite or allFin(x) # opt-in ⇒ finite input
   ensure:
     x.len != 0 or result == T(0)
-    not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
+    assumeFinite or (not allFin(x) or classify(result) !=
+        fcNan) # finite ⇒ no NaN (guard path only)
   body:
-    result = neumaierSum(x)
+    result = neumaierSum(x, assumeFinite)
 
-func sumK*[T: SomeFloat](x: openArray[T], K: int): T {.contractual.} =
+func sumK*[T: SomeFloat](x: openArray[T], K: int,
+    useFastTwoSum: static bool = false,
+    assumeFinite: static bool = false): T {.contractual.} =
   ## ORO `SumK` (Alg 4.8): K-fold cascaded compensated summation. Applies the
   ## error-free `transform` K times, summing the partial results: K=1 is the
   ## naive `twoSum` chain (≈ `naiveSum`), K=2 the first-order compensated sum
@@ -117,9 +146,25 @@ func sumK*[T: SomeFloat](x: openArray[T], K: int): T {.contractual.} =
   ## Forward bound (ORO Thm 4.9): `|fl(sumK) - Σxᵢ| <= γ_{n-1}^K · Σ|xᵢ| /
   ## (1 - γ_{n-1}^K)`, so the error is `(n·u)^K · Σ|xᵢ|`. `K` is the cascade
   ## depth (K >= 1; K < 1 is treated as 1).
+  ##
+  ## `useFastTwoSum` threads into every `transform` pass: the branched Dekker
+  ## `twoSumFast` (3 FLOPs + 1 branch) replaces the branchless `twoSum` (6
+  ## FLOPs). Bit-identical to the default — both are the addition EFT — so the
+  ## bound above holds unchanged; only the throughput shape differs (see
+  ## `transform`). Default off: the branchless form wins on cancellation data.
+  ##
+  ## `assumeFinite` threads into `transform` (dropping its per-step `isFin`
+  ## guard) and drops the cascade's `isFin(result)` compensation guard. Bit-
+  ## identical to the default on finite non-overflowing input (neither guard
+  ## fires there); an overflow then corrupts the cascade with a NaN error
+  ## instead of localizing it. See `kahanSum` for the contract shape; the
+  ## default (`false`) keeps the guards and is safe.
+  require:
+    not assumeFinite or allFin(x) # opt-in ⇒ finite input
   ensure:
     x.len != 0 or result == T(0)
-    not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
+    assumeFinite or (not allFin(x) or classify(result) !=
+        fcNan) # finite ⇒ no NaN (guard path only)
   body:
     if x.len == 0:
       return T(0)
@@ -127,19 +172,23 @@ func sumK*[T: SomeFloat](x: openArray[T], K: int): T {.contractual.} =
       return x[0]
     let k = if K < 1: 1 else: K
     var cur: seq[T]
-    result = transform(x, cur)
+    result = transform(x, cur, useFastTwoSum, assumeFinite)
     var nxt: seq[T]
     for _ in 1 ..< k:
       if cur.len == 0:
         break
-      let res = transform(cur, nxt)
+      let res = transform(cur, nxt, useFastTwoSum, assumeFinite)
       # An overflow poisons the error vector (a `twoSum` whose sum overflows
       # yields a NaN error), so a later partial `res` can be NaN/Inf. Adding it
       # to a running ±Inf would evaluate Inf - Inf = NaN; the true finite sum
       # is unrecoverable past the float range anyway, so skip the compensation
       # once the running sum overflowed (±Inf is the correctly-signed round).
-      if isFin(result):
+      # The opt-in path drops this guard (the caller promises no overflow).
+      when assumeFinite:
         result += res
+      else:
+        if isFin(result):
+          result += res
       swap(cur, nxt) # reuse the two buffers, no per-iteration allocation
 
 # ---------------------------------------------------------------------------

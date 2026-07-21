@@ -158,3 +158,46 @@ suite "compensated sums agree on exact data":
     let xs = [1.0, 1e100, 1.0, -1e100]
     check neumaierSum(xs) == kleinSum(xs)
     check kleinSum(xs) == 2.0
+
+suite "assumeFinite opt-in is bit-identical on finite non-overflowing input":
+  # The opt-in strips the `isFin` guards; on inputs where no guard ever fires
+  # (all finite, no partial-sum overflow) both paths run the same EFT, so the
+  # result is bit-for-bit identical. The magnitude case (1e100, no overflow) is
+  # the strongest witness — the guard is live but never trips there.
+  template parity(T: typedesc) =
+    let ints = [T(1.0), T(2.0), T(3.0), T(4.0), T(5.0)]
+    let tenths = [T(0.1), T(0.1), T(0.1), T(0.1), T(0.1),
+                  T(0.1), T(0.1), T(0.1), T(0.1), T(0.1)]
+    # 1e20 is finite in both float32 and float64 (max f32 ~3.4e38); 1e100 would
+    # overflow f32 to Inf and trip the opt-in's `allFin` precondition.
+    let mag = [T(1.0), T(1e20), T(1.0), T(-1e20)]
+    check kahanSum(ints, assumeFinite = true) == kahanSum(ints)
+    check kahanSum(tenths, assumeFinite = true) == kahanSum(tenths)
+    check neumaierSum(ints, assumeFinite = true) == neumaierSum(ints)
+    check neumaierSum(tenths, assumeFinite = true) == neumaierSum(tenths)
+    check neumaierSum(mag, assumeFinite = true) == neumaierSum(mag)
+    check kleinSum(ints, assumeFinite = true) == kleinSum(ints)
+    check kleinSum(tenths, assumeFinite = true) == kleinSum(tenths)
+    check kleinSum(mag, assumeFinite = true) == kleinSum(mag)
+
+  test "float64 parity": parity(float64)
+  test "float32 parity": parity(float32)
+
+  test "sum2 (ORO alias of neumaier) parity":
+    let mag = [1.0, 1e20, 1.0, -1e20]
+    check sum2(mag, assumeFinite = true) == sum2(mag)
+    check sum2(mag, assumeFinite = true) == 2.0
+
+  test "the guard is load-bearing (guarded path localizes overflow to Inf)":
+    # The opt-in strips the `isFin` guards; on overflow its output is undefined
+    # (a `twoSum(Inf, v)` precondition violation in debug, garbage in release),
+    # so it is not pinned. The guarded default localizes the overflow to a
+    # single-sign ±Inf — the safety property the guard exists for — checked in
+    # every sum's own "finite input never yields NaN" test and restated here as
+    # the contrast that makes the opt-in meaningful.
+    var x: seq[float64] = @[]
+    for _ in 0 ..< 256:
+      x.add 1e308
+    check classify(kahanSum(x)) == fcInf
+    check classify(neumaierSum(x)) == fcInf
+    check classify(kleinSum(x)) == fcInf
