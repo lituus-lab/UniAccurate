@@ -124,4 +124,16 @@ proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   else:
     kleinSum(s)
 
+proc ua_sum_shewchuk(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Correctly-rounded sum of `n` doubles at `x` via Shewchuk's adaptive-precision
+  ## expansion (the CPython `fsum` recipe): `Σ xᵢ` rounded once under
+  ## round-to-nearest-even. Empty input is `0`. Never raises; NaN/Inf propagate.
+  ## Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is
+  ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  shewchukSum(toOpenArray(arr, 0, last))
+
 {.pop.}

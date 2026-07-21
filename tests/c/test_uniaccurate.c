@@ -53,6 +53,18 @@ int main(void) {
   sum_call("neumaier empty", ua_sum_neumaier, NULL, 0, 0.0);
   sum_call("klein empty", ua_sum_klein, NULL, 0, 0.0);
 
+  /* Correctly-rounded: integer-valued data is exact, empty is 0. */
+  sum_call("shewchuk [1..4]", ua_sum_shewchuk, small, 4, 10.0);
+  sum_call("shewchuk empty", ua_sum_shewchuk, NULL, 0, 0.0);
+
+  /* Correctly-rounded wins the 0.1·10 case (naive yields 0.999...). */
+  double tenths[] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
+  sum_call("shewchuk 0.1x10", ua_sum_shewchuk, tenths, 10, 1.0);
+
+  /* Correctly-rounded recovers the sum under catastrophic cancellation. */
+  double cancel[] = {1.0, 1e20, 1.0, -1e20};
+  sum_call("shewchuk cancel", ua_sum_shewchuk, cancel, 4, 2.0);
+
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
   return 1;
