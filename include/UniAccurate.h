@@ -53,6 +53,20 @@ double ua_sum_klein(const double *x, size_t n);
  * Null x with n > 0 is undefined. */
 double ua_sum_shewchuk(const double *x, size_t n);
 
+/* Correctly-rounded sum of n doubles at x via the Neal small superaccumulator
+ * (integer exact accumulation, single final rounding). Empty input is 0.
+ * NaN/Inf propagate; finite inputs never yield NaN (true overflow ⇒ ±Inf,
+ * opposite-sign overflow cancels exactly). Never raises. Null x with n > 0
+ * is undefined. */
+double ua_sum_exact(const double *x, size_t n);
+
+/* Correctly-rounded dot product Σ xᵢyᵢ of n pairs via the Neal small
+ * superaccumulator (64×64→128 product accumulation, single final rounding).
+ * Empty input is 0. NaN/Inf operands propagate; finite operands never yield
+ * NaN (products held at true magnitude, opposite-sign overflow cancels
+ * exactly). Never raises. Null x or y with n > 0 is undefined. */
+double ua_dot_exact(const double *x, const double *y, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

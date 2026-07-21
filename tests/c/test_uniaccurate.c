@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include <stddef.h>
 #include "UniAccurate.h"
 
@@ -23,6 +24,13 @@ static void two_sum(const char *name, double a, double b, double ws, double we) 
 static void sum_call(const char *name, double (*f)(const double *, size_t),
                      const double *x, size_t n, double want) {
   double got = f(x, n);
+  if (got != want) { printf("FAIL %s: got %g want %g\n", name, got, want); failures++; }
+  else printf("ok   %s = %g\n", name, got);
+}
+
+static void dot_call(const char *name, double (*f)(const double *, const double *, size_t),
+                     const double *x, const double *y, size_t n, double want) {
+  double got = f(x, y, n);
   if (got != want) { printf("FAIL %s: got %g want %g\n", name, got, want); failures++; }
   else printf("ok   %s = %g\n", name, got);
 }
@@ -64,6 +72,34 @@ int main(void) {
   /* Correctly-rounded recovers the sum under catastrophic cancellation. */
   double cancel[] = {1.0, 1e20, 1.0, -1e20};
   sum_call("shewchuk cancel", ua_sum_shewchuk, cancel, 4, 2.0);
+
+  /* Neal superaccumulator: same correctly-rounded cases as shewchuk, plus
+   * huge-magnitude exact cancellation (max + max - max = max; naive hits
+   * +Inf + -Inf = NaN) and true finite overflow to +Inf. */
+  sum_call("exact [1..4]", ua_sum_exact, small, 4, 10.0);
+  sum_call("exact empty", ua_sum_exact, NULL, 0, 0.0);
+  sum_call("exact 0.1x10", ua_sum_exact, tenths, 10, 1.0);
+  sum_call("exact cancel", ua_sum_exact, cancel, 4, 2.0);
+  double m = DBL_MAX;
+  double hugeCancel[] = {m, m, -m};
+  sum_call("exact max+max-max", ua_sum_exact, hugeCancel, 3, m);
+  { double g = ua_sum_exact(hugeCancel, 2); /* m + m: true overflow */
+    if (isinf(g) && g > 0) printf("ok   exact max+max = +inf\n");
+    else { printf("FAIL exact max+max: got %g want +inf\n", g); failures++; } }
+
+  /* Exact dot: integer-exact, empty, product-overflow held at true magnitude
+   * (1e100·1e100 = 1e200 representable, minus the small term recovered), and
+   * opposite-sign finite overflow that cancels exactly (never NaN). */
+  double a[] = {1.0, 2.0, 3.0};
+  double b[] = {4.0, 5.0, 6.0};
+  dot_call("exact dot [1..3]·[4..6]", ua_dot_exact, a, b, 3, 32.0);
+  dot_call("exact dot empty", ua_dot_exact, NULL, NULL, 0, 0.0);
+  double pb[] = {1e100, 1.0};
+  double pc[] = {1e100, -1.0};
+  dot_call("exact dot product-overflow held", ua_dot_exact, pb, pc, 2, 1e100 * 1e100 - 1.0);
+  double px[] = {m, -m};
+  double py[] = {m, m};
+  dot_call("exact dot opposite-sign cancel", ua_dot_exact, px, py, 2, 0.0);
 
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);

@@ -138,4 +138,30 @@ proc ua_sum_shewchuk(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   shewchukSum(toOpenArray(arr, 0, last))
 
+proc ua_sum_exact(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Correctly-rounded sum of `n` doubles at `x` via the Neal small
+  ## superaccumulator (integer exact accumulation, single final rounding). Empty
+  ## input is `0`. Never raises; NaN/Inf propagate. Finite inputs never yield NaN
+  ## (true overflow ⇒ ±Inf, opposite-sign overflow cancels exactly). Null `x`
+  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  superSum(toOpenArray(arr, 0, last))
+
+proc ua_dot_exact(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Correctly-rounded dot product `Σ xᵢyᵢ` of `n` pairs via the Neal small
+  ## superaccumulator (64×64→128 product accumulation, single final rounding).
+  ## Empty input is `0`. Never raises; NaN/Inf operands propagate. Finite operands
+  ## never yield NaN (products held at true magnitude, opposite-sign overflow
+  ## cancels exactly). Null `x` or `y` with `n > 0` is undefined. No SIMD kernel —
+  ## scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  superDot(toOpenArray(ax, 0, last), toOpenArray(ay, 0, last))
+
 {.pop.}
