@@ -102,21 +102,23 @@ def _pow2(e: int) -> Fraction:
 def _floor_log2(x: Fraction) -> int:
     """Largest ``e`` with ``2**e <= x`` for positive ``x``."""
     num, den = x.numerator, x.denominator
-    # 2**e * den <= num  <=>  2**e <= num/den = x; compare in integers via
-    # scaling by 2**k so the shift stays non-negative.
+    # 2**e <= num/den  <=>  2**e * den <= num. Compare in integers, scaling both
+    # sides by 2**k = 2**max(0, -e) so the left shift 1 << (e+k) stays non-
+    # negative even when e is decremented into a dyadic gap (e.g. x = 1/3): k is
+    # recomputed every iteration, never fixed once at the entry estimate.
     e = num.bit_length() - den.bit_length()
-    # Adjust so 2**e * den and num compare without negative shifts: lift both
-    # sides by a power of two when e is negative.
-    k = max(0, -e)
-    lhs = (1 << (e + k)) * den  # = 2**(e+k) * den
-    rhs = num << k              # = num * 2**k
-    if lhs <= rhs:
-        while (1 << (e + 1 + k)) * den <= (num << k):
-            e += 1
-    else:
-        while (1 << (e + k)) * den > (num << k):
-            e -= 1
-    return e
+    while True:
+        k = max(0, -e)
+        lhs = (1 << (e + k)) * den  # = 2**(e+k) * den
+        rhs = num << k              # = num * 2**k
+        if lhs <= rhs:
+            # e fits; check whether e+1 also fits before accepting.
+            k1 = max(0, -(e + 1))
+            if (1 << (e + 1 + k1)) * den <= (num << k1):
+                e += 1
+                continue
+            return e
+        e -= 1
 
 
 def bound_correctly_rounded(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
