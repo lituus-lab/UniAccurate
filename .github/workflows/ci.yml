@@ -79,6 +79,9 @@ jobs:
   simd:
     name: SIMD (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Read-only token: the job only checks out and runs tests, never pushes.
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +90,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: '2.2.10'
