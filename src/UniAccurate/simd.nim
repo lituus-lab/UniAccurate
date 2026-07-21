@@ -333,7 +333,8 @@ when defined(simd):
         let xv = vld1q_f32(cast[pointer](unsafeAddr x[i]))
         let yv = vld1q_f32(cast[pointer](unsafeAddr y[i]))
         let h = vmulq_f32(xv, yv)
-        let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv, yv) # xᵢ·yᵢ − h (exact product error)
+        let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv,
+            yv) # xᵢ·yᵢ − h (exact product error)
         let s2 = vaddq_f32(s, h)
         let z = vsubq_f32(s2, s)
         let r2 = vaddq_f32(vsubq_f32(s, vsubq_f32(s2, z)), vsubq_f32(h, z))

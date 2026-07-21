@@ -67,6 +67,30 @@ double ua_sum_exact(const double *x, size_t n);
  * exactly). Never raises. Null x or y with n > 0 is undefined. */
 double ua_dot_exact(const double *x, const double *y, size_t n);
 
+/* Naive dot product Σ xᵢyᵢ of n pairs (left-to-right). Empty input is 0.
+ * NaN/Inf propagate; finite inputs never yield NaN (opposite-sign product
+ * overflow → NaN is recovered via the exact superaccumulator). Never raises.
+ * Null x or y with n > 0 is undefined. Under -d:simd an FMA reduce kernel runs
+ * on AVX2/AVX-512; NEON float64 has no SIMD path. */
+double ua_dot_naive(const double *x, const double *y, size_t n);
+
+/* Compensated dot product at twice working precision (ORO Alg. 5.3, K = 2;
+ * Graillat Dot2FMA) of n pairs. Empty input is 0. NaN/Inf propagate; finite
+ * inputs never yield NaN. Never raises. Null x or y with n > 0 is undefined.
+ * Under -d:simd the Dot2 FMA kernel runs on AVX2/AVX-512 with a
+ * lane-concentration guard that falls back to the scalar body; NEON float64
+ * has no SIMD path. */
+double ua_dot2(const double *x, const double *y, size_t n);
+
+/* K-fold compensated dot product (ORO Alg. 5.3) of n pairs: k = 1 the naive
+ * dot, k = 2 twice precision (≈ ua_dot2), k = 3 threefold; k < 1 is treated as
+ * 1. Empty input is 0. NaN/Inf propagate; finite inputs never yield NaN. Never
+ * raises. Null x or y with n > 0 is undefined. Under -d:simd k = 2 dispatches
+ * to the Dot2 FMA kernel and k = 3 to the DotK3 FMA kernel (each with a
+ * lane-concentration guard that falls back to the scalar body); other k run the
+ * scalar cascade. NEON float64 has no SIMD path. */
+double ua_dot_k(const double *x, const double *y, size_t n, int k);
+
 /* ORO sum2 (Alg 4.1) — the magnitude-robust compensated sum, value-identical to
  * ua_sum_neumaier. Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate;
  * finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.

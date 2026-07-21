@@ -164,6 +164,85 @@ proc ua_dot_exact(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   superDot(toOpenArray(ax, 0, last), toOpenArray(ay, 0, last))
 
+proc ua_dot_naive(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Naive dot product `Σ xᵢyᵢ` of `n` pairs (left-to-right). Empty input is `0`.
+  ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN: a product of
+  ## two finite values can overflow to ±Inf, and opposite-sign ±Inf products can
+  ## combine to NaN (an order artifact), so on that rare overflow the result is
+  ## recovered exactly via `superDot`. Null `x` or `y` with `n > 0` is undefined.
+  ## Under `-d:simd` the FMA reduce kernel runs on AVX2/AVX-512 (the `superDot`
+  ## fallback is shared with the scalar path); NEON float64 has no SIMD path.
+  if n == 0:
+    return 0.0
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template sx: untyped = toOpenArray(ax, 0, last)
+  template sy: untyped = toOpenArray(ay, 0, last)
+  when defined(simd):
+    when simdF64Enabled:
+      let r = naiveDotSimd(sx, sy)
+      if classify(r) == fcNan and allFin(sx) and allFin(sy): superDot(sx, sy) else: r
+    else:
+      naiveDot(sx, sy)
+  else:
+    naiveDot(sx, sy)
+
+proc ua_dot2(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Compensated dot product at twice working precision (ORO Alg. 5.3, K = 2;
+  ## Graillat Dot2FMA) of `n` pairs. Empty input is `0`. Never raises; NaN/Inf
+  ## propagate. Finite inputs never yield NaN (overflow ⇒ ±Inf, or `superDot` on
+  ## opposite-sign product overflow via the `naiveDot` fallback). Null `x` or `y`
+  ## with `n > 0` is undefined. Under `-d:simd` the Dot2 FMA kernel runs on
+  ## AVX2/AVX-512 with a lane-concentration guard that falls back to the scalar
+  ## `dot2` on cancellation data; NEON float64 has no SIMD path.
+  if n == 0:
+    return 0.0
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template sx: untyped = toOpenArray(ax, 0, last)
+  template sy: untyped = toOpenArray(ay, 0, last)
+  when defined(simd):
+    when simdF64Enabled:
+      let (r, reliable) = dot2Simd(sx, sy)
+      if reliable: r else: dot2(sx, sy)
+    else:
+      dot2(sx, sy)
+  else:
+    dot2(sx, sy)
+
+proc ua_dot_k(x, y: ptr cdouble; n: csize_t; k: cint): cdouble {.raises: [].} =
+  ## K-fold compensated dot product (ORO Alg. 5.3) of `n` pairs: `k = 1` the
+  ## naive dot, `k = 2` twice precision (≈ `ua_dot2`), `k = 3` threefold; `k < 1`
+  ## is treated as 1. Empty input is `0`. Never raises; NaN/Inf propagate. Finite
+  ## inputs never yield NaN. Null `x` or `y` with `n > 0` is undefined. Under
+  ## `-d:simd` `k = 2` dispatches to the Dot2 FMA kernel and `k = 3` to the DotK3
+  ## FMA kernel (each with a lane-concentration guard that falls back to the
+  ## scalar body); other `k` run the scalar cascade. NEON float64 has no SIMD
+  ## path.
+  if n == 0:
+    return 0.0
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  template sx: untyped = toOpenArray(ax, 0, last)
+  template sy: untyped = toOpenArray(ay, 0, last)
+  when defined(simd):
+    when simdF64Enabled:
+      if k == 2:
+        let (r, reliable) = dot2Simd(sx, sy)
+        if reliable: r else: dot2(sx, sy)
+      elif k == 3:
+        let (r, reliable) = dotK3Simd(sx, sy)
+        if reliable: r else: dotK(sx, sy, 3)
+      else:
+        dotK(sx, sy, int(k))
+    else:
+      dotK(sx, sy, int(k))
+  else:
+    dotK(sx, sy, int(k))
+
 proc ua_sum_oro(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## ORO `sum2` (Alg 4.1) — the magnitude-robust compensated sum, value-identical
   ## to `neumaierSum`. Empty input is `0`. Never raises; NaN/Inf propagate.
