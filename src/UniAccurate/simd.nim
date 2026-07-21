@@ -37,45 +37,45 @@ when defined(simd):
     simdF32Enabled* = simdF64Enabled or defined(arm64)
       ## float32 SIMD is available (float64 ISAs or arm64 NEON).
 
+  template defineNaiveV(name, zero, loadv, addv, storev, L: untyped) =
+    func name(x: openArray[float64]): float64 =
+      if x.len == 0: return 0.0
+      var acc = zero
+      var i = 0
+      let n = x.len
+      while i + L <= n:
+        acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
+        i += L
+      var lanes: array[L, float64]
+      storev(cast[pointer](addr lanes[0]), acc)
+      result = 0.0
+      for j in 0 ..< L: result += lanes[j]
+      while i < n: result += x[i]; inc i
+
+  template defineCompV(name, zero, loadv, addv, storev, L: untyped,
+                      merge: proc(v: openArray[float64]): float64) =
+    func name(x: openArray[float64]): (float64, bool) =
+      if x.len == 0: return (0.0, true)
+      var acc = zero
+      var i = 0
+      let n = x.len
+      while i + L <= n:
+        acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
+        i += L
+      var lanes: array[L, float64]
+      storev(cast[pointer](addr lanes[0]), acc)
+      var tail = 0.0
+      while i < n: tail += x[i]; inc i
+      var vals: array[L + 1, float64]
+      for j in 0 ..< L: vals[j] = lanes[j]
+      vals[L] = tail
+      let r = merge(vals.toOpenArray(0, L))
+      var maxLane = 0.0
+      for v in vals: maxLane = max(maxLane, abs(v))
+      (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
+
   when defined(avx512):
     import nimsimd/avx512/f
-
-    template defineNaiveV(name, zero, loadv, addv, storev, L: untyped) =
-      func name(x: openArray[float64]): float64 =
-        if x.len == 0: return 0.0
-        var acc = zero
-        var i = 0
-        let n = x.len
-        while i + L <= n:
-          acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
-          i += L
-        var lanes: array[L, float64]
-        storev(cast[pointer](addr lanes[0]), acc)
-        result = 0.0
-        for j in 0 ..< L: result += lanes[j]
-        while i < n: result += x[i]; inc i
-
-    template defineCompV(name, zero, loadv, addv, storev, L: untyped,
-                        merge: proc(v: openArray[float64]): float64) =
-      func name(x: openArray[float64]): (float64, bool) =
-        if x.len == 0: return (0.0, true)
-        var acc = zero
-        var i = 0
-        let n = x.len
-        while i + L <= n:
-          acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
-          i += L
-        var lanes: array[L, float64]
-        storev(cast[pointer](addr lanes[0]), acc)
-        var tail = 0.0
-        while i < n: tail += x[i]; inc i
-        var vals: array[L + 1, float64]
-        for j in 0 ..< L: vals[j] = lanes[j]
-        vals[L] = tail
-        let r = merge(vals.toOpenArray(0, L))
-        var maxLane = 0.0
-        for v in vals: maxLane = max(maxLane, abs(v))
-        (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
 
     defineNaiveV(naiveSumSimdAvx512, mm512_setzero_pd(), mm512_loadu_pd,
                  mm512_add_pd, mm512_storeu_pd, 8)
@@ -91,43 +91,6 @@ when defined(simd):
 
   elif defined(avx2):
     import nimsimd/avx2
-
-    template defineNaiveV(name, zero, loadv, addv, storev, L: untyped) =
-      func name(x: openArray[float64]): float64 =
-        if x.len == 0: return 0.0
-        var acc = zero
-        var i = 0
-        let n = x.len
-        while i + L <= n:
-          acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
-          i += L
-        var lanes: array[L, float64]
-        storev(cast[pointer](addr lanes[0]), acc)
-        result = 0.0
-        for j in 0 ..< L: result += lanes[j]
-        while i < n: result += x[i]; inc i
-
-    template defineCompV(name, zero, loadv, addv, storev, L: untyped,
-                        merge: proc(v: openArray[float64]): float64) =
-      func name(x: openArray[float64]): (float64, bool) =
-        if x.len == 0: return (0.0, true)
-        var acc = zero
-        var i = 0
-        let n = x.len
-        while i + L <= n:
-          acc = addv(acc, loadv(cast[pointer](unsafeAddr x[i])))
-          i += L
-        var lanes: array[L, float64]
-        storev(cast[pointer](addr lanes[0]), acc)
-        var tail = 0.0
-        while i < n: tail += x[i]; inc i
-        var vals: array[L + 1, float64]
-        for j in 0 ..< L: vals[j] = lanes[j]
-        vals[L] = tail
-        let r = merge(vals.toOpenArray(0, L))
-        var maxLane = 0.0
-        for v in vals: maxLane = max(maxLane, abs(v))
-        (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
 
     defineNaiveV(naiveSumSimdAvx2, mm256_setzero_pd(), mm256_loadu_pd,
                  mm256_add_pd, mm256_storeu_pd, 4)
