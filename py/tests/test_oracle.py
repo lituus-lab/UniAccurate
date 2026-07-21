@@ -111,7 +111,7 @@ DOT_IDS = [c[0] for c in DOT_CASES]
 @pytest.mark.parametrize("label,xs,ys", DOT_CASES, ids=DOT_IDS)
 def test_dot_exact_forward_bound(label, xs, ys):
     s = exact_dot(xs, ys)
-    e = sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys))
+    e = sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys, strict=True))
     err = abs(Fraction(uniaccurate.exact_dot(xs, ys)) - s)
     limit = bound_correctly_rounded(len(xs), e, s)
     assert err <= limit, (
