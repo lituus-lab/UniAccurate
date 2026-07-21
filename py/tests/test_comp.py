@@ -12,6 +12,9 @@ COMPS = [
     ("klein_sum", uniaccurate.klein_sum),
     ("shewchuk_sum", uniaccurate.shewchuk_sum),
     ("exact_sum", uniaccurate.exact_sum),
+    ("oro_sum", uniaccurate.oro_sum),
+    ("acc_sum", uniaccurate.acc_sum),
+    ("near_sum", uniaccurate.near_sum),
 ]
 
 # Where Kahan loses a small addend dominated by the running sum, Neumaier and
@@ -54,9 +57,19 @@ def test_kahan_loses_dominated_addend():
 @pytest.mark.parametrize("name,fn", [("neumaier_sum", uniaccurate.neumaier_sum),
                                      ("klein_sum", uniaccurate.klein_sum),
                                      ("shewchuk_sum", uniaccurate.shewchuk_sum),
-                                     ("exact_sum", uniaccurate.exact_sum)])
+                                     ("exact_sum", uniaccurate.exact_sum),
+                                     ("oro_sum", uniaccurate.oro_sum),
+                                     ("acc_sum", uniaccurate.acc_sum),
+                                     ("near_sum", uniaccurate.near_sum)])
 def test_magnitude_robust_recovers(name, fn):
     assert fn(MAGNITUDE) == 2.0
+
+
+@pytest.mark.parametrize("name,fn", COMPS)
+def test_finite_overflow_inf_not_nan(name, fn):
+    # The Rump family falls back to the exact superaccumulator on overflow;
+    # every compensated/correctly-rounded variant gives a single-sign +Inf.
+    assert math.isinf(fn([1e308] * 256)) and fn([1e308] * 256) > 0
 
 
 @pytest.mark.parametrize("name,fn", COMPS)
@@ -89,3 +102,78 @@ def test_all_compensated_agree_on_exact_data():
     assert uniaccurate.klein_sum(x) == n
     assert uniaccurate.shewchuk_sum(x) == n
     assert uniaccurate.exact_sum(x) == n
+    assert uniaccurate.oro_sum(x) == n
+    assert uniaccurate.acc_sum(x) == n
+    assert uniaccurate.near_sum(x) == n
+
+
+# condition_number is a diagnostic, not a forward-bound sum, so it is checked
+# for behavior directly rather than against the oracle bounds above.
+def test_condition_number_no_cancellation_is_one():
+    assert uniaccurate.condition_number([1.0, 1.0, 1.0, 1.0]) == 1.0
+
+
+def test_condition_number_zero_sum_is_inf():
+    assert math.isinf(uniaccurate.condition_number([1.0, -1.0]))
+
+
+def test_condition_number_empty_is_zero():
+    assert uniaccurate.condition_number([]) == 0.0
+
+
+def test_condition_number_cancellation_is_large():
+    cond = uniaccurate.condition_number([1.0, 1e20, 1.0, -1e20])
+    assert cond > 1e19
+
+
+def test_condition_number_magnitude_overflow_is_inf():
+    # sum|x_i| overflows the float range even though the inputs are finite:
+    # the exact ratio is not representable, so the diagnostic reports +inf.
+    assert math.isinf(uniaccurate.condition_number([1e308] * 256))
+
+
+def test_condition_number_finite_input_never_nan():
+    assert not math.isnan(uniaccurate.condition_number([1e308] * 256))
+    assert not math.isnan(uniaccurate.condition_number([1.0, -1.0]))
+
+
+def test_condition_number_non_numeric_raises():
+    with pytest.raises(TypeError):
+        uniaccurate.condition_number([1.0, "x", 2.0])
+    with pytest.raises(TypeError):
+        uniaccurate.condition_number([1.0, None])
+    with pytest.raises(TypeError):
+        uniaccurate.condition_number([True, 2.0])
+
+
+# sum_k takes a cascade depth K; K=1 is naive, K>=2 is compensated.
+def test_sum_k_recovers_one_on_tenths():
+    assert uniaccurate.sum_k([0.1] * 10, 2) == 1.0
+
+
+def test_sum_k_k1_matches_naive_on_integer_data():
+    x = list(range(1, 101))
+    assert uniaccurate.sum_k(x, 1) == uniaccurate.naive_sum(x)
+
+
+def test_sum_k_k0_treated_as_naive():
+    # k < 1 is clamped to 1, so k=0 behaves like the naive twoSum chain.
+    assert uniaccurate.sum_k([1.0, 2.0, 3.0], 0) == 6.0
+
+
+def test_sum_k_empty_is_zero():
+    assert uniaccurate.sum_k([], 2) == 0.0
+
+
+def test_sum_k_non_int_k_raises():
+    with pytest.raises(ValueError):
+        uniaccurate.sum_k([1.0, 2.0], 2.0)
+    with pytest.raises(ValueError):
+        uniaccurate.sum_k([1.0, 2.0], "2")
+    with pytest.raises(ValueError):
+        uniaccurate.sum_k([1.0, 2.0], True)
+
+
+def test_sum_k_non_numeric_raises():
+    with pytest.raises(TypeError):
+        uniaccurate.sum_k([1.0, "x"], 2)

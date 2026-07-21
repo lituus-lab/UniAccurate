@@ -17,15 +17,19 @@ from oracle import (
     abs_sum,
     bound_compensated,
     bound_correctly_rounded,
+    bound_faithful,
     bound_naive,
     bound_pairwise,
+    bound_sumk,
     exact_dot,
     exact_sum,
 )
 
 # (name, function, bound(n, E, S)). The compensated bound closes over `leading`:
 # 3 for Kahan (no final +c), 2 for Neumaier/Klein (final +c applied). The
-# correctly-rounded bound uses the exact sum S (0.5 ulp of fl(S)).
+# correctly-rounded bound uses the exact sum S (0.5 ulp of fl(S)); the faithful
+# bound (accSum) is 1 ulp of fl(S); oro_sum is the ORO sum2, value-identical to
+# neumaier_sum so the compensated leading=2 bound applies.
 ALGS = [
     ("naive_sum", uniaccurate.naive_sum, bound_naive),
     ("pairwise_sum", uniaccurate.pairwise_sum, bound_pairwise),
@@ -35,6 +39,9 @@ ALGS = [
     ("klein_sum", uniaccurate.klein_sum, partial(bound_compensated, leading=2)),
     ("shewchuk_sum", uniaccurate.shewchuk_sum, bound_correctly_rounded),
     ("exact_sum", uniaccurate.exact_sum, bound_correctly_rounded),
+    ("oro_sum", uniaccurate.oro_sum, partial(bound_compensated, leading=2)),
+    ("acc_sum", uniaccurate.acc_sum, bound_faithful),
+    ("near_sum", uniaccurate.near_sum, bound_correctly_rounded),
 ]
 
 SIZES = [1, 2, 3, 5, 10, 50, 100, 500, 1000]
@@ -116,5 +123,20 @@ def test_dot_exact_forward_bound(label, xs, ys):
     limit = bound_correctly_rounded(len(xs), e, s)
     assert err <= limit, (
         f"{label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
+        f"(E={float(e):.6e}, n={len(xs)})"
+    )
+
+
+# ORO SumK takes a cascade depth K, so it is checked outside the ALGS loop.
+# K=1 is the naive twoSum chain (naive bound); K=2 first-order compensated
+# (γ²·E); K=3 second-order (γ³·E). Each K is checked against bound_sumk.
+@pytest.mark.parametrize("k", [1, 2, 3])
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
+def test_sum_k_forward_bound(k, case):
+    label, xs, s, e = case
+    err = abs(Fraction(uniaccurate.sum_k(xs, k)) - s)
+    limit = bound_sumk(len(xs), e, s, K=k)
+    assert err <= limit, (
+        f"sum_k K={k} {label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
         f"(E={float(e):.6e}, n={len(xs)})"
     )

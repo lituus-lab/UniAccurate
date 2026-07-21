@@ -11,6 +11,11 @@ from ._core import (
     _sum_klein_c,
     _sum_shewchuk_c,
     _sum_exact_c,
+    _sum_oro_c,
+    _sum_acc_c,
+    _sum_near_c,
+    _sum_k_c,
+    _condition_number_c,
     _dot_exact_c,
 )
 
@@ -109,6 +114,56 @@ def exact_sum(values):
     return _sum_exact_c(_validate(values))
 
 
+def oro_sum(values):
+    """ORO sum2 (Alg 4.1) — magnitude-robust compensated sum, value-identical to
+    `neumaier_sum`. Empty input is 0.0. NaN/Inf propagate; finite inputs never
+    yield NaN (overflow gives ±Inf). Raises TypeError on non-numeric elements.
+    """
+    return _sum_oro_c(_validate(values))
+
+
+def acc_sum(values):
+    """Rump AccSum (Alg 4.5) — faithful rounding of the exact sum (within 1 ulp;
+    no float lies between the result and the exact sum). Empty input is 0.0.
+    NaN/Inf propagate (non-finite input or a sigma0 overflow falls back to the
+    exact superaccumulator); finite inputs never yield NaN. Raises TypeError on
+    non-numeric elements.
+    """
+    return _sum_acc_c(_validate(values))
+
+
+def near_sum(values):
+    """Rump NearSum (Alg 7.4) — correctly-rounded sum: the round-to-nearest of
+    the exact real sum, bit-for-bit. Empty input is 0.0. NaN/Inf propagate
+    (non-finite input or a sigma0 overflow falls back to the exact
+    superaccumulator); finite inputs never yield NaN. Raises TypeError on
+    non-numeric elements.
+    """
+    return _sum_near_c(_validate(values))
+
+
+def sum_k(values, k):
+    """ORO SumK (Alg 4.8) — K-fold cascaded compensated sum: k=1 naive, k=2
+    first-order compensated (≈ `neumaier_sum`), k=3 second-order (≈
+    `klein_sum`); `k < 1` is treated as 1. Empty input is 0.0. NaN/Inf propagate;
+    finite inputs never yield NaN. Raises TypeError on non-numeric elements and
+    `ValueError` if `k` is not an int.
+    """
+    if not isinstance(k, int) or isinstance(k, bool):
+        raise ValueError(f"k must be an int, got {type(k).__name__}")
+    return _sum_k_c(_validate(values), k)
+
+
+def condition_number(values):
+    """Condition number of the sum, `cond = sum|x_i| / |sum(x_i)|` (Higham 2002,
+    §4.1): 1.0 for a no-cancellation sum, large under catastrophic cancellation,
+    +inf when the sum is exactly 0 or `sum|x_i|` overflows the float range, 0.0
+    for empty input. Finite inputs never yield NaN. Raises TypeError on
+    non-numeric elements.
+    """
+    return _condition_number_c(_validate(values))
+
+
 def exact_dot(xs, ys):
     """Correctly-rounded dot product `sum(x_i * y_i)` (Neal small
     superaccumulator: 64x64->128 product accumulation, single final rounding).
@@ -127,15 +182,20 @@ def version():
 
 __all__ = [
     "__version__",
+    "acc_sum",
+    "condition_number",
     "exact_dot",
     "exact_sum",
     "kahan_sum",
     "klein_sum",
     "naive_sum",
+    "near_sum",
     "neumaier_sum",
+    "oro_sum",
     "pairwise_sum",
     "pairwise_sum_iterative",
     "shewchuk_sum",
+    "sum_k",
     "two_sum",
     "version",
 ]

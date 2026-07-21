@@ -15,6 +15,11 @@ cdef extern from "UniAccurate.h":
     double ua_sum_shewchuk(const double *x, size_t n)
     double ua_sum_exact(const double *x, size_t n)
     double ua_dot_exact(const double *x, const double *y, size_t n)
+    double ua_sum_oro(const double *x, size_t n)
+    double ua_sum_near(const double *x, size_t n)
+    double ua_sum_acc(const double *x, size_t n)
+    double ua_sum_k(const double *x, size_t n, int k)
+    double ua_condition_number(const double *x, size_t n)
 
 
 def two_sum(double a, double b):
@@ -83,6 +88,48 @@ def _sum_shewchuk_c(list values):
 def _sum_exact_c(list values):
     """Raw C call: correctly-rounded (Neal superaccumulator) sum of `values`."""
     return _sum_raw(values, ua_sum_exact)
+
+
+def _sum_oro_c(list values):
+    """Raw C call: ORO sum2 (magnitude-robust compensated) sum of `values`."""
+    return _sum_raw(values, ua_sum_oro)
+
+
+def _sum_acc_c(list values):
+    """Raw C call: Rump AccSum (faithful, within 1 ulp) sum of `values`."""
+    return _sum_raw(values, ua_sum_acc)
+
+
+def _sum_near_c(list values):
+    """Raw C call: Rump NearSum (correctly rounded) sum of `values`."""
+    return _sum_raw(values, ua_sum_near)
+
+
+def _condition_number_c(list values):
+    """Raw C call: condition number Σ|xᵢ|/|Σxᵢ| of `values`."""
+    return _sum_raw(values, ua_condition_number)
+
+
+cdef _sum_k_raw(list values, int k, double (*fn)(const double *, size_t, int)):
+    """Copy `values` into a malloc'd double buffer, call `fn(buf, n, k)`, free."""
+    cdef Py_ssize_t n = len(values)
+    if n == 0:
+        return 0.0
+    cdef double *buf = <double *>malloc(n * sizeof(double))
+    if buf == NULL:
+        raise MemoryError()
+    cdef Py_ssize_t i
+    try:
+        for i in range(n):
+            buf[i] = values[i]
+        return fn(buf, <size_t>n, k)
+    finally:
+        free(buf)
+
+
+def _sum_k_c(list values, int k):
+    """Raw C call: ORO SumK (K-fold cascaded compensated) sum of `values`."""
+    return _sum_k_raw(values, k, ua_sum_k)
 
 
 cdef _dot_raw(list xs, list ys, double (*fn)(const double *, const double *, size_t)):

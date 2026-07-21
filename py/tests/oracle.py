@@ -147,3 +147,31 @@ def bound_correctly_rounded(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
     if e < -1022:  # subnormal range: ulp is the smallest subnormal
         return Fraction(1, 1 << 1074)
     return (2 * U) * _pow2(e)
+
+
+def bound_faithful(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
+    """Faithful forward bound: ``1 * ulp(fl(S))`` — no float lies between the
+    result and the exact sum, so the error is under one unit in the last place.
+    Twice ``bound_correctly_rounded`` (which already bounds ``0.5 ulp`` at up to
+    2x loose), so this bounds ``1 ulp`` at up to 2x loose — rigorous in exact
+    arithmetic. ``s`` is the exact sum (as for ``bound_correctly_rounded``).
+    """
+    return 2 * bound_correctly_rounded(n, e, s)
+
+
+def bound_sumk(n: int, e: Fraction, s: Fraction = 0, *, K: int) -> Fraction:
+    """ORO ``SumK`` forward bound (ORO Thm 4.9): the real-arithmetic K-fold
+    cascade error ``gamma_{n-1}^K * E / (1 - gamma_{n-1}^K)`` (so the error is
+    ``(n*u)^K * E``), **plus** a final-rounding budget of ``1 ulp of |S|``.
+
+    The cascade term is the documented bound on the *unrounded* distillation; for
+    ``K >= 2`` it falls below the single rounding the float result incurs (and
+    that the oracle incurs rounding the real sum), neither of which the
+    real-arithmetic bound includes. The budget ``2u * |S|`` covers both, so the
+    check is the documented bound rather than a loose margin: ``K=1`` is the
+    naive bound (cascade term dominates), ``K >= 2`` is K-fold precision (budget
+    dominates).
+    """
+    g = gamma(n - 1)
+    gk = g ** K
+    return gk * e / (1 - gk) + 2 * U * abs(s)
