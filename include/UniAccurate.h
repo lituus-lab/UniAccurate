@@ -80,6 +80,27 @@ double ua_sum_oro(const double *x, size_t n);
  * Never raises. Single-threaded, reentrant. Null x with n > 0 is undefined. */
 double ua_sum_near(const double *x, size_t n);
 
+/* Rump AccSum (Alg 4.5) — a faithful rounding of the exact sum (within 1 ulp).
+ * Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate (non-finite input
+ * or a sigma0 overflow falls back to the exact superaccumulator); finite inputs
+ * never yield NaN (overflow ⇒ ±Inf). Never raises. Single-threaded, reentrant.
+ * Null x with n > 0 is undefined. */
+double ua_sum_acc(const double *x, size_t n);
+
+/* ORO SumK (Alg 4.8) — K-fold cascaded compensated sum: K=1 naive, K=2
+ * first-order compensated (≈ ua_sum_neumaier), K=3 second-order (≈ ua_sum_klein);
+ * k < 1 is treated as 1. Empty input (n == 0, x may be NULL) is 0. NaN/Inf
+ * propagate; finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
+ * Single-threaded, reentrant. Null x with n > 0 is undefined. */
+double ua_sum_k(const double *x, size_t n, int k);
+
+/* Condition number of the sum, cond = Σ|xᵢ| / |Σxᵢ|: 1 for a no-cancellation
+ * sum, large under catastrophic cancellation, +Inf when the sum is exactly 0 or
+ * Σ|xᵢ| overflows the float range, 0 for empty input. Finite inputs never yield
+ * NaN. Never raises. Single-threaded, reentrant. Null x with n > 0 is
+ * undefined. */
+double ua_condition_number(const double *x, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

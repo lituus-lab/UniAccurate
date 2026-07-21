@@ -35,6 +35,25 @@ static void dot_call(const char *name, double (*f)(const double *, const double 
   else printf("ok   %s = %g\n", name, got);
 }
 
+static void sum_k_call(const char *name, double (*f)(const double *, size_t, int),
+                       const double *x, size_t n, int k, double want) {
+  double got = f(x, n, k);
+  if (got != want) { printf("FAIL %s: got %g want %g\n", name, got, want); failures++; }
+  else printf("ok   %s = %g\n", name, got);
+}
+
+/* Condition number: +Inf is a valid result (zero sum or magnitude overflow), so
+ * compare by class as well as value. */
+static void cond_call(const char *name, double (*f)(const double *, size_t),
+                      const double *x, size_t n, double want) {
+  double got = f(x, n);
+  int ok = (isnan(got) && isnan(want))
+        || (isinf(got) && isinf(want) && (got > 0) == (want > 0))
+        || (got == want);
+  if (!ok) { printf("FAIL %s: got %g want %g\n", name, got, want); failures++; }
+  else printf("ok   %s = %g\n", name, got);
+}
+
 int main(void) {
   two_sum("1 + 2", 1.0, 2.0, 3.0, 0.0);
   two_sum("1 + 2e16", 1.0, 2e16, 2e16, 1.0);
@@ -114,6 +133,31 @@ int main(void) {
   sum_call("near empty", ua_sum_near, NULL, 0, 0.0);
   sum_call("near 0.1x10", ua_sum_near, tenths, 10, 1.0);
   sum_call("near cancel", ua_sum_near, cancel, 4, 2.0);
+
+  /* Rump AccSum (faithful): integer-exact, empty 0, 0.1·10 → 1.0 (the exact
+   * sum is a float, so faithful picks it), cancellation → 2.0. */
+  sum_call("acc [1..4]", ua_sum_acc, small, 4, 10.0);
+  sum_call("acc empty", ua_sum_acc, NULL, 0, 0.0);
+  sum_call("acc 0.1x10", ua_sum_acc, tenths, 10, 1.0);
+  sum_call("acc cancel", ua_sum_acc, cancel, 4, 2.0);
+
+  /* ORO SumK: K=1 naive (integer-exact), K=2 first-order compensated (recovers
+   * 0.1·10 and the cancellation case), K<1 treated as 1. */
+  sum_k_call("sum_k K=1 [1..4]", ua_sum_k, small, 4, 1, 10.0);
+  sum_k_call("sum_k K=2 [1..4]", ua_sum_k, small, 4, 2, 10.0);
+  sum_k_call("sum_k K=2 0.1x10", ua_sum_k, tenths, 10, 2, 1.0);
+  sum_k_call("sum_k K=2 cancel", ua_sum_k, cancel, 4, 2, 2.0);
+  sum_k_call("sum_k K=0 == K=1", ua_sum_k, small, 4, 0, 10.0);
+
+  /* Condition number: 1 on no cancellation, +Inf on an exact-zero sum, 0 on
+   * empty, large (≥ 1e19) under catastrophic cancellation. */
+  double ones[] = {1.0, 1.0, 1.0, 1.0};
+  cond_call("cond no-cancel", ua_condition_number, ones, 4, 1.0);
+  cond_call("cond zero-sum", ua_condition_number, (double[]){1.0, -1.0}, 2, INFINITY);
+  cond_call("cond empty", ua_condition_number, NULL, 0, 0.0);
+  { double c = ua_condition_number(cancel, 4);
+    if (c > 1e19) printf("ok   cond cancel = %g (> 1e19)\n", c);
+    else { printf("FAIL cond cancel: got %g want > 1e19\n", c); failures++; } }
 
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);

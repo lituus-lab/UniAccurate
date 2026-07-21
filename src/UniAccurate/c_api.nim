@@ -187,4 +187,42 @@ proc ua_sum_near(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   nearSum(toOpenArray(arr, 0, last))
 
+proc ua_sum_acc(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Rump `AccSum` (Alg 4.5) — a *faithful* rounding of `Σ xᵢ` (within 1 ulp of
+  ## the exact sum). Empty input is `0`. Never raises; NaN/Inf propagate
+  ## (non-finite input or a `sigma0` overflow falls back to the exact
+  ## superaccumulator, which is correctly-rounded and so still faithful). Finite
+  ## inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is undefined.
+  ## No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  accSum(toOpenArray(arr, 0, last))
+
+proc ua_sum_k(x: ptr cdouble; n: csize_t; k: cint): cdouble {.raises: [].} =
+  ## ORO `SumK` (Alg 4.8) — K-fold cascaded compensated sum: K=1 the naive
+  ## `twoSum` chain, K=2 first-order compensated (≈ `neumaierSum`), K=3
+  ## second-order (≈ `kleinSum`); `k < 1` is treated as 1. Empty input is `0`.
+  ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN (overflow ⇒
+  ## ±Inf). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar under
+  ## `-d:simd` (ADR-0007).
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  sumK(toOpenArray(arr, 0, last), int(k))
+
+proc ua_condition_number(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ## Condition number of the sum, `cond = Σ|xᵢ| / |Σxᵢ|` (Higham 2002, §4.1): `1`
+  ## for a no-cancellation sum, large under catastrophic cancellation, `Inf` when
+  ## the sum is exactly `0` or `Σ|xᵢ|` overflows the float range, `0` for empty
+  ## input. Never raises; finite inputs never yield NaN. Null `x` with `n > 0` is
+  ## undefined.
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  conditionNumber(toOpenArray(arr, 0, last))
+
 {.pop.}
