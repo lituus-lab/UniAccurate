@@ -52,8 +52,13 @@ def abs_sum(values):
 
 
 def exact_dot(xs, ys):
-    """Exact real dot product ``sum(x_i * y_i)`` (floats coerced to rationals)."""
-    return sum(Fraction(x) * Fraction(y) for x, y in zip(xs, ys))
+    """Exact real dot product ``sum(x_i * y_i)`` (floats coerced to rationals).
+
+    ``strict=True`` so unequal-length ``xs`` / ``ys`` raise instead of silently
+    truncating to the shorter — a truncation would compute the wrong exact dot
+    and hide a test bug.
+    """
+    return sum(Fraction(x) * Fraction(y) for x, y in zip(xs, ys, strict=True))
 
 
 def gamma(k: int) -> Fraction:
