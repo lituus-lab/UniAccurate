@@ -246,7 +246,7 @@ algorithm (documented in ADR-0007).
 nbText: """
 ## Exact summation (the small superaccumulator)
 
-`shewchuckSum` is already correctly rounded — `½ ulp(fl(Σ xᵢ))` — holding the
+`shewchukSum` is already correctly rounded — `½ ulp(fl(Σ xᵢ))` — holding the
 sum as a float-precision expansion whose `twoSum` merge collects every bit
 without rounding loss. Its one ceiling is the float range itself: an
 intermediate partial that overflows (the running magnitude exceeds the float
@@ -278,7 +278,7 @@ ABI dispatches to the scalar algorithm (ADR-0007).
 nbCode:
   let bigCancel = [1.0, 1e100, 1.0, -1e100]
   echo "superSum (magnitude) = ", superSum(bigCancel)
-  echo "shewchuckSum         = ", shewchuckSum(bigCancel)
+  echo "shewchukSum         = ", shewchukSum(bigCancel)
   let dotX = [1.0, 2.0, 3.0]
   let dotY = [4.0, 5.0, 6.0]
   echo "superDot             = ", superDot(dotX, dotY)
