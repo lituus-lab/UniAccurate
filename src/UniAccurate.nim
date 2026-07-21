@@ -5,10 +5,12 @@ import UniAccurate/twosum
 import UniAccurate/algorithms/naivesum
 import UniAccurate/algorithms/pairwisesum
 import UniAccurate/algorithms/compensatedsum
+import UniAccurate/algorithms/shewchuksum
 export twosum
 export naivesum
 export pairwisesum
 export compensatedsum
+export shewchuksum
 when defined(simd):
   import UniAccurate/simd
   export simd

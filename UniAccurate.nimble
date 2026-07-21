@@ -2,11 +2,11 @@
 # Copyright 2026 lituus-lab
 # UniAccurate — error-free transforms and accurate summation/dot-product.
 
-version       = "0.1.0"
-author        = "lituus-lab"
-description   = "Error-free transforms and accurate summation/dot-product (Nim + C-ABI + Python)"
-license       = "Apache-2.0"
-srcDir        = "src"
+version = "0.1.0"
+author = "lituus-lab"
+description = "Error-free transforms and accurate summation/dot-product (Nim + C-ABI + Python)"
+license = "Apache-2.0"
+srcDir = "src"
 
 requires "nim >= 2.0.0"
 requires "https://github.com/lbartoletti/NimContracts#fix/generic-proc-support"
@@ -43,6 +43,9 @@ task sum, "Summation tests (debug, contracts active)":
 task comp, "Compensated summation tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_comp tests/test_compensatedsum.nim"
 
+task shewchuk, "Shewchuk summation tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_shewchuk tests/test_shewchuksum.nim"
+
 task prop, "Randomized property tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_prop tests/test_property.nim"
 
@@ -50,6 +53,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nimble eft"
   exec "nimble sum"
   exec "nimble comp"
+  exec "nimble shewchuk"
   exec "nimble prop"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
@@ -57,12 +61,14 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
   exec "nimble eft"
   exec "nimble sum"
   exec "nimble comp"
+  exec "nimble shewchuk"
   exec "nimble prop"
 
 task testCiRelease, "Nim tests (CI subset, release)":
@@ -70,6 +76,7 @@ task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_naive_rel tests/test_naivesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_pairwise_rel tests/test_pairwisesum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_comp_rel tests/test_compensatedsum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testAll, "debug + release + C ABI":
@@ -86,7 +93,7 @@ const
     when defined(windows): "libUniAccurate.dll"
     elif defined(macosx): "libUniAccurate.dylib"
     else: "libUniAccurate.so"
-  staticLib = "libUniAccurate.a"  # MinGW `ar` on Windows, so `.a` everywhere.
+  staticLib = "libUniAccurate.a" # MinGW `ar` on Windows, so `.a` everywhere.
 
   # @rpath install_name, so the copy bundled in the wheel is found at import.
   macArgs =

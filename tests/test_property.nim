@@ -65,6 +65,7 @@ suite "finite inputs never yield NaN (no overflow)":
       check classify(kahanSum(x)) != fcNan
       check classify(neumaierSum(x)) != fcNan
       check classify(kleinSum(x)) != fcNan
+      check classify(shewchukSum(x)) != fcNan
 
 suite "finite inputs never yield NaN (overflow-prone)":
   # Naive and the compensated sums carry the per-step `isFin` guard (or, for
@@ -82,10 +83,11 @@ suite "finite inputs never yield NaN (overflow-prone)":
       check classify(kahanSum(x)) != fcNan
       check classify(neumaierSum(x)) != fcNan
       check classify(kleinSum(x)) != fcNan
+      check classify(shewchukSum(x)) != fcNan
 
 suite "exact integer data agrees across all sums":
   var r = Seed xor 2
-  test "naive == pairwise == iterative == kahan == neumaier == klein":
+  test "naive == pairwise == iterative == kahan == neumaier == klein == shewchuk":
     for n in [1, 2, 3, 10, 100, 500]:
       var x = newSeq[float64](n)
       for i in 0 ..< n:
@@ -96,10 +98,11 @@ suite "exact integer data agrees across all sums":
       check kahanSum(x) == want
       check neumaierSum(x) == want
       check kleinSum(x) == want
+      check shewchukSum(x) == want
 
 suite "float32 compensated finite never NaN":
   var r = Seed xor 3
-  test "kahan/neumaier/klein, bounded random float32 up to n=10000":
+  test "kahan/neumaier/klein/shewchuk, bounded random float32 up to n=10000":
     for n in [1, 10, 100, 1000, 10000]:
       var x = newSeq[float32](n)
       for i in 0 ..< n:
@@ -107,3 +110,4 @@ suite "float32 compensated finite never NaN":
       check classify(kahanSum(x)) != fcNan
       check classify(neumaierSum(x)) != fcNan
       check classify(kleinSum(x)) != fcNan
+      check classify(shewchukSum(x)) != fcNan
