@@ -17,6 +17,8 @@ from oracle import (
     abs_sum,
     bound_compensated,
     bound_correctly_rounded,
+    bound_dot_compensated,
+    bound_dot_naive,
     bound_faithful,
     bound_naive,
     bound_pairwise,
@@ -123,6 +125,47 @@ def test_dot_exact_forward_bound(label, xs, ys):
     limit = bound_correctly_rounded(len(xs), e, s)
     assert err <= limit, (
         f"{label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
+        f"(E={float(e):.6e}, n={len(xs)})"
+    )
+
+
+# Naive and twice-precision compensated dots, checked against the exact dot
+# oracle. naive_dot uses the loose magnitude bound (E); dot2 uses the ORO Thm
+# 5.4 / Graillat Dot2 bound (2u|S| + 2 gamma_{n+1}(2u)^2 E).
+DOT_ALGS = [
+    ("naive_dot", uniaccurate.naive_dot, bound_dot_naive),
+    ("dot2", uniaccurate.dot2, partial(bound_dot_compensated, K=2)),
+]
+
+# Precompute the exact dot oracle (S, E) once per dot case.
+DOT_ORACLE = [
+    (label, xs, ys, exact_dot(xs, ys),
+     sum(abs(Fraction(x) * Fraction(y)) for x, y in zip(xs, ys)))
+    for label, xs, ys in DOT_CASES
+]
+
+
+@pytest.mark.parametrize("name,fn,bound", DOT_ALGS, ids=[a[0] for a in DOT_ALGS])
+@pytest.mark.parametrize("case", DOT_ORACLE, ids=DOT_IDS)
+def test_dot_forward_bound(name, fn, bound, case):
+    label, xs, ys, s, e = case
+    err = abs(Fraction(fn(xs, ys)) - s)
+    limit = bound(len(xs), e, s)
+    assert err <= limit, (
+        f"{name} {label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
+        f"(E={float(e):.6e}, n={len(xs)})"
+    )
+
+
+# dot_k takes a cascade depth K; K=1 naive, K=2 twice, K=3 threefold precision.
+@pytest.mark.parametrize("k", [1, 2, 3])
+@pytest.mark.parametrize("case", DOT_ORACLE, ids=DOT_IDS)
+def test_dot_k_forward_bound(k, case):
+    label, xs, ys, s, e = case
+    err = abs(Fraction(uniaccurate.dot_k(xs, ys, k)) - s)
+    limit = bound_dot_compensated(len(xs), e, s, K=k)
+    assert err <= limit, (
+        f"dot_k K={k} {label}: |err|={float(err):.6e} > bound={float(limit):.6e} "
         f"(E={float(e):.6e}, n={len(xs)})"
     )
 

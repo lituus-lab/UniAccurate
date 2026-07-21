@@ -17,6 +17,9 @@ from ._core import (
     _sum_k_c,
     _condition_number_c,
     _dot_exact_c,
+    _dot_naive_c,
+    _dot2_c,
+    _dot_k_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -175,6 +178,36 @@ def exact_dot(xs, ys):
     return _dot_exact_c(_validate(xs), _validate(ys))
 
 
+def naive_dot(xs, ys):
+    """Naive (left-to-right) dot product `sum(x_i * y_i)`. Empty input is 0.0.
+    NaN/Inf propagate; finite inputs never yield NaN (a rare opposite-sign
+    product overflow to NaN is recovered via the exact superaccumulator). Raises
+    TypeError on non-numeric elements, ValueError on mismatched lengths.
+    """
+    return _dot_naive_c(_validate(xs), _validate(ys))
+
+
+def dot2(xs, ys):
+    """Compensated dot product at twice working precision (ORO Alg 5.3, K=2;
+    Graillat Dot2FMA) `sum(x_i * y_i)`. Empty input is 0.0. NaN/Inf propagate;
+    finite inputs never yield NaN. Raises TypeError on non-numeric elements,
+    ValueError on mismatched lengths.
+    """
+    return _dot2_c(_validate(xs), _validate(ys))
+
+
+def dot_k(xs, ys, k):
+    """K-fold compensated dot product (ORO Alg 5.3) `sum(x_i * y_i)`: k=1 the
+    naive dot, k=2 twice precision (≈ `dot2`), k=3 threefold; `k < 1` is treated
+    as 1. Empty input is 0.0. NaN/Inf propagate; finite inputs never yield NaN.
+    Raises TypeError on non-numeric elements, ValueError on mismatched lengths
+    or a non-int `k`.
+    """
+    if not isinstance(k, int) or isinstance(k, bool):
+        raise ValueError(f"k must be an int, got {type(k).__name__}")
+    return _dot_k_c(_validate(xs), _validate(ys), k)
+
+
 def version():
     """C library version string."""
     return _version_c().decode("ascii")
@@ -184,10 +217,13 @@ __all__ = [
     "__version__",
     "acc_sum",
     "condition_number",
+    "dot2",
+    "dot_k",
     "exact_dot",
     "exact_sum",
     "kahan_sum",
     "klein_sum",
+    "naive_dot",
     "naive_sum",
     "near_sum",
     "neumaier_sum",

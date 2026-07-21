@@ -177,3 +177,96 @@ def test_sum_k_non_int_k_raises():
 def test_sum_k_non_numeric_raises():
     with pytest.raises(TypeError):
         uniaccurate.sum_k([1.0, "x"], 2)
+
+
+# Dot product family: naive_dot, dot2, dot_k (k=1 naive, k=2 twice, k=3 threefold).
+DOTS = [
+    ("naive_dot", uniaccurate.naive_dot),
+    ("dot2", uniaccurate.dot2),
+]
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_empty_is_zero(name, fn):
+    assert fn([], []) == 0.0
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_small_exact(name, fn):
+    assert fn([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]) == 32.0
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_int_inputs_promoted(name, fn):
+    assert fn([1, 2, 3], [4, 5, 6]) == 32.0
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_integer_valued_exact(name, fn):
+    x = list(range(1, 101))
+    assert fn(x, x) == sum(i * i for i in x)
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_non_numeric_raises(name, fn):
+    with pytest.raises(TypeError):
+        fn([1.0, "x"], [2.0, 1.0])
+    with pytest.raises(TypeError):
+        fn([1.0, None], [2.0, 1.0])
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_mismatched_length_raises(name, fn):
+    with pytest.raises(ValueError):
+        fn([1.0, 2.0, 3.0], [1.0, 2.0])
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_non_finite_propagates(name, fn):
+    assert math.isnan(fn([1.0, float("nan")], [2.0, 1.0]))
+    assert math.isinf(fn([1.0, float("inf")], [2.0, 1.0]))
+
+
+@pytest.mark.parametrize("name,fn", DOTS)
+def test_dot_finite_input_never_nan(name, fn):
+    # Products of near-max finite values overflow; opposite-sign overflow would
+    # be NaN were it not for the superDot recovery. Finite input ⇒ never NaN.
+    m = 1e308
+    assert not math.isnan(fn([m, m], [m, -m]))
+
+
+def test_dot2_recovers_cancellation_lost_by_naive():
+    x = [1e20, 1.0, -1e20]
+    y = [1.0, 1.0, 1.0]
+    assert uniaccurate.dot2(x, y) == 1.0
+    assert uniaccurate.naive_dot(x, y) != 1.0
+
+
+def test_dot2_equals_dot_k2():
+    x = [0.1, 0.2, 0.3, 1e20, -1e20]
+    y = [0.3, 0.2, 0.1, 1.0, 1.0]
+    assert uniaccurate.dot2(x, y) == uniaccurate.dot_k(x, y, 2)
+
+
+def test_dot_k_k1_matches_naive():
+    x = [1.0, 2.0, 3.0]
+    y = [4.0, 5.0, 6.0]
+    assert uniaccurate.dot_k(x, y, 1) == uniaccurate.naive_dot(x, y)
+
+
+def test_dot_k_k0_treated_as_naive():
+    assert uniaccurate.dot_k([1.0, 2.0, 3.0], [4.0, 5.0, 6.0], 0) == 32.0
+
+
+def test_dot_k_non_int_k_raises():
+    with pytest.raises(ValueError):
+        uniaccurate.dot_k([1.0, 2.0], [3.0, 4.0], 2.0)
+    with pytest.raises(ValueError):
+        uniaccurate.dot_k([1.0, 2.0], [3.0, 4.0], "2")
+    with pytest.raises(ValueError):
+        uniaccurate.dot_k([1.0, 2.0], [3.0, 4.0], True)
+
+
+def test_dot_k_non_numeric_raises():
+    with pytest.raises(TypeError):
+        uniaccurate.dot_k([1.0, "x"], [2.0, 1.0], 2)

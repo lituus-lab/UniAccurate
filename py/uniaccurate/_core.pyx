@@ -15,6 +15,9 @@ cdef extern from "UniAccurate.h":
     double ua_sum_shewchuk(const double *x, size_t n)
     double ua_sum_exact(const double *x, size_t n)
     double ua_dot_exact(const double *x, const double *y, size_t n)
+    double ua_dot_naive(const double *x, const double *y, size_t n)
+    double ua_dot2(const double *x, const double *y, size_t n)
+    double ua_dot_k(const double *x, const double *y, size_t n, int k)
     double ua_sum_oro(const double *x, size_t n)
     double ua_sum_near(const double *x, size_t n)
     double ua_sum_acc(const double *x, size_t n)
@@ -156,3 +159,40 @@ cdef _dot_raw(list xs, list ys, double (*fn)(const double *, const double *, siz
 def _dot_exact_c(list xs, list ys):
     """Raw C call: correctly-rounded (Neal superaccumulator) dot of `xs`·`ys`."""
     return _dot_raw(xs, ys, ua_dot_exact)
+
+
+def _dot_naive_c(list xs, list ys):
+    """Raw C call: naive (left-to-right) dot of `xs`·`ys`."""
+    return _dot_raw(xs, ys, ua_dot_naive)
+
+
+def _dot2_c(list xs, list ys):
+    """Raw C call: twice-precision compensated dot (ORO Alg 5.3, K=2) of `xs`·`ys`."""
+    return _dot_raw(xs, ys, ua_dot2)
+
+
+cdef _dot_k_raw(list xs, list ys, int k,
+                double (*fn)(const double *, const double *, size_t, int)):
+    """Copy `xs`/`ys` into malloc'd double buffers, call `fn(buf, buf, n, k)`, free."""
+    cdef Py_ssize_t n = len(xs)
+    if n == 0:
+        return 0.0
+    if len(ys) != n:
+        raise ValueError("dot product requires equal-length inputs")
+    cdef double *bx = <double *>malloc(n * sizeof(double))
+    cdef double *by = <double *>malloc(n * sizeof(double))
+    if bx == NULL or by == NULL:
+        free(bx); free(by)
+        raise MemoryError()
+    cdef Py_ssize_t i
+    try:
+        for i in range(n):
+            bx[i] = xs[i]; by[i] = ys[i]
+        return fn(bx, by, <size_t>n, k)
+    finally:
+        free(bx); free(by)
+
+
+def _dot_k_c(list xs, list ys, int k):
+    """Raw C call: K-fold compensated dot (ORO Alg 5.3) of `xs`·`ys`."""
+    return _dot_k_raw(xs, ys, k, ua_dot_k)

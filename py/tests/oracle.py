@@ -175,3 +175,37 @@ def bound_sumk(n: int, e: Fraction, s: Fraction = 0, *, K: int) -> Fraction:
     g = gamma(n - 1)
     gk = g ** K
     return gk * e / (1 - gk) + 2 * U * abs(s)
+
+
+def gamma_2u(k: int) -> Fraction:
+    """Higham's ``gamma_k`` at the doubled unit roundoff ``2u`` (the FMA product
+    error in the dot recurrence is bounded at ``2u``): ``(2u)*k / (1 - (2u)*k)``;
+    ``0`` for ``k <= 0``.
+    """
+    if k <= 0:
+        return Fraction(0)
+    return (2 * U) * k / (1 - (2 * U) * k)
+
+
+def bound_dot_naive(n: int, e: Fraction, s: Fraction = 0) -> Fraction:
+    """Naive dot forward bound. Each product ``fl(x_i y_i)`` errs by at most
+    ``u * |x_i y_i|`` (one rounding), and the ``n`` products are then summed
+    naively (a further ``gamma_{n-1}`` on the rounded products) — at most
+    ``2n`` roundings in total, so ``gamma_{2n} * E`` bounds the absolute error
+    in the magnitude ``E = sum|x_i y_i|``. ``s`` is unused (the bound is in
+    ``E``); the bound is loose on purpose (the naive dot can be very inaccurate
+    under cancellation, where ``E >> |S|``).
+    """
+    return gamma(2 * n) * e
+
+
+def bound_dot_compensated(n: int, e: Fraction, s: Fraction, *,
+                          K: int) -> Fraction:
+    """Compensated dot forward bound (ORO Thm 5.4 / Graillat Dot2):
+    ``2u * |S| + 2 * gamma_{n+1}(2u)^K * E`` — a final rounding of ``|S|`` plus
+    the K-fold cascade error in the magnitude ``E = sum|x_i y_i|``. ``K = 2`` is
+    twice working precision (Graillat Dot2); larger ``K`` gives K-fold. The
+    ``2u * |S|`` term is the unavoidable final rounding; the cascade term is
+    ``(n * 2u)^K * E``, far below it for ``K >= 2`` at these ``n``.
+    """
+    return 2 * U * abs(s) + 2 * gamma_2u(n + 1) ** K * e
