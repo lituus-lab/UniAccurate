@@ -92,7 +92,7 @@ when defined(simd):
           checkFinite(neumaierSumSimd)
           checkFinite(kleinSumSimd)
 
-  when defined(arm64):
+  when simdF32Enabled:
     suite "float32 NEON path":
       var r = Seed xor 3
       test "naive/pairwise close to scalar, compensated bit-exact, never NaN":
