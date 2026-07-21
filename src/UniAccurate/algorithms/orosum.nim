@@ -307,6 +307,28 @@ func rumpTransformK[T: SomeFloat](p: var seq[T], offset: T): T =
     return T(Inf) # sentinel for the sigma0-overflow path
   result = tau1 + (tau2 + naiveSum(p))
 
+func rumpExtract[T: SomeFloat](x: openArray[T], p: var seq[T]): tuple[
+    done: bool, val: T, tau1: T, tau2: T] =
+  ## Shared front of `accSum` and `nearSum`: the empty, single-element,
+  ## non-finite, and `sigma0`-overflow cases all return `done = true` with the
+  ## final `val` (0, `x[0]`, or the `superSum` fallback). Otherwise `x` is copied
+  ## into `p`, `rumpTransform(p, 0)` runs, and the residual `p` (in place) with
+  ## the `(tau1, tau2)` split are returned for the caller's result-specific tail.
+  ## `p` is meaningful only when `done = false`.
+  if x.len == 0:
+    return (true, T(0), T(0), T(0))
+  if x.len == 1:
+    return (true, x[0], T(0), T(0))
+  if not allFin(x):
+    return (true, superSum(x), T(0), T(0))
+  p = newSeq[T](x.len)
+  for i in 0 ..< x.len:
+    p[i] = x[i]
+  let (tau1, tau2) = rumpTransform(p, T(0))
+  if not isFin(tau1): # sigma0-overflow or mid-accumulation overflow
+    return (true, superSum(x), T(0), T(0))
+  return (false, T(0), tau1, tau2)
+
 func accSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Rump `AccSum` (Part I, Alg 4.5): a *faithful* rounding of `sum(x)` — no
   ## float lies between the result and the exact sum, so `|result - sum(x)| <
@@ -321,19 +343,11 @@ func accSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     x.len != 0 or result == T(0)
     not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
   body:
-    if x.len == 0:
-      return T(0)
-    if x.len == 1:
-      return x[0]
-    if not allFin(x):
-      return superSum(x)
-    var p = newSeq[T](x.len)
-    for i in 0 ..< x.len:
-      p[i] = x[i]
-    let (tau1, tau2) = rumpTransform(p, T(0))         # p is now the residual p'
-    if not isFin(tau1): # sigma0-overflow or mid-accumulation overflow
-      return superSum(x)
-    result = tau1 + (tau2 + naiveSum(p))
+    var p: seq[T]
+    let ex = rumpExtract(x, p)
+    if ex.done:
+      return ex.val
+    result = ex.tau1 + (ex.tau2 + naiveSum(p)) # p is the residual p'
 
 func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
   ## Rump `NearSum` (Part II, Alg 7.4): the *correctly rounded* sum — the
@@ -352,18 +366,12 @@ func nearSum*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
     x.len != 0 or result == T(0)
     not allFin(x) or classify(result) != fcNan # finite input ⇒ no NaN
   body:
-    if x.len == 0:
-      return T(0)
-    if x.len == 1:
-      return x[0]
-    if not allFin(x):
-      return superSum(x)
-    var p = newSeq[T](x.len)
-    for i in 0 ..< x.len:
-      p[i] = x[i]
-    let (tau1, tau2) = rumpTransform(p, T(0))         # p is now the residual p'
-    if not isFin(tau1): # sigma0-overflow → exact fallback
-      return superSum(x)
+    var p: seq[T]
+    let ex = rumpExtract(x, p)
+    if ex.done:
+      return ex.val
+    let tau1 = ex.tau1
+    let tau2 = ex.tau2
     let tau20 = tau2 + naiveSum(p) # fl(tau2 + sum(p'))
     let res = tau1 + tau20 # FastTwoSum(tau1, tau20): |tau1| >= |tau20|
     let delta = tau20 - (res - tau1) # res + delta = tau1 + tau20 exactly
