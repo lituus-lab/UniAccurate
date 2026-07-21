@@ -42,6 +42,15 @@ static void sum_k_call(const char *name, double (*f)(const double *, size_t, int
   else printf("ok   %s = %g\n", name, got);
 }
 
+static void dot_k_call(const char *name,
+                       double (*f)(const double *, const double *, size_t, int),
+                       const double *x, const double *y, size_t n, int k,
+                       double want) {
+  double got = f(x, y, n, k);
+  if (got != want) { printf("FAIL %s: got %g want %g\n", name, got, want); failures++; }
+  else printf("ok   %s = %g\n", name, got);
+}
+
 /* Condition number: +Inf is a valid result (zero sum or magnitude overflow), so
  * compare by class as well as value. */
 static void cond_call(const char *name, double (*f)(const double *, size_t),
@@ -119,6 +128,29 @@ int main(void) {
   double px[] = {m, -m};
   double py[] = {m, m};
   dot_call("exact dot opposite-sign cancel", ua_dot_exact, px, py, 2, 0.0);
+
+  /* Naive / dot2 / dotK: integer-exact, empty 0, dot2 recovers the cancellation
+   * naive loses (the dot analogue of 0.1·10), dot2 == dotK K=2 bit-for-bit,
+   * dotK K=1 == naive, K<1 treated as 1, and finite opposite-sign product
+   * overflow never NaN (recovered via superDot through the naiveDot fallback). */
+  dot_call("naive dot [1..3]·[4..6]", ua_dot_naive, a, b, 3, 32.0);
+  dot_call("naive dot empty", ua_dot_naive, NULL, NULL, 0, 0.0);
+  dot_call("dot2 [1..3]·[4..6]", ua_dot2, a, b, 3, 32.0);
+  dot_call("dot2 empty", ua_dot2, NULL, NULL, 0, 0.0);
+  double dcx[] = {1e20, 1.0, -1e20};
+  double dcy[] = {1.0, 1.0, 1.0};
+  dot_call("dot2 recovers cancel", ua_dot2, dcx, dcy, 3, 1.0);
+  dot_k_call("dot_k K=1 [1..3]·[4..6]", ua_dot_k, a, b, 3, 1, 32.0);
+  dot_k_call("dot_k K=2 == dot2 cancel", ua_dot_k, dcx, dcy, 3, 2, 1.0);
+  dot_k_call("dot_k K=3 cancel", ua_dot_k, dcx, dcy, 3, 3, 1.0);
+  dot_k_call("dot_k K=0 == K=1", ua_dot_k, a, b, 3, 0, 32.0);
+  dot_k_call("dot_k empty", ua_dot_k, NULL, NULL, 0, 3, 0.0);
+  { double g = ua_dot_naive(px, py, 2); /* finite m·(-m) + m·m overflow, no NaN */
+    if (isnan(g)) { printf("FAIL naive dot overflow: got NaN want finite/inf\n"); failures++; }
+    else printf("ok   naive dot opposite-sign overflow = %g\n", g); }
+  { double g = ua_dot2(px, py, 2);
+    if (isnan(g)) { printf("FAIL dot2 overflow: got NaN want finite/inf\n"); failures++; }
+    else printf("ok   dot2 opposite-sign overflow = %g\n", g); }
 
   /* ORO sum2 (magnitude-robust compensated): integer-exact, empty 0, recovers
    * 0.1·10 and the cancellation case where Kahan loses the small addends. */
