@@ -295,6 +295,80 @@ The C ABI exposes `ua_sum_exact` / `ua_dot_exact` and Python exposes
 """
 
 nbText: """
+## Faithful and correctly-rounded summation (ORO / Rump)
+
+The compensated and exact sums above split the work per *element*; the
+Ogita–Rump–Oishi and Rump families split it per *order of rounding error*. Both
+build on the error-free `transform` (ORO Vecsum, Alg 4.6) rather than per-step
+feedback, so the error vector is distilled once and re-summed.
+
+`sum2` is ORO Alg 4.1 — the magnitude-robust compensated sum, value-identical to
+`neumaierSum` (the ORO Vecsum-with-final-correction *is* Neumaier's scheme),
+exposed under the ORO name for API symmetry. `sumK` is ORO Alg 4.8: the
+`transform` applied K times, summing the partials, so each extra cascade level
+compensates one order of rounding error — K=1 the naive `twoSum` chain, K=2 the
+first-order compensated sum (≈ `neumaierSum`), K=3 the second-order (≈
+`kleinSum`).
+
+    sum2:  (2u + O(nu²)) · Σ|xᵢ|                    ≈ neumaierSum (ORO Alg 4.1)
+    sumK:  γ_{n-1}^K · Σ|xᵢ| / (1 - γ_{n-1}^K)      (ORO Alg 4.8)
+
+The bound is in `E = Σ|xᵢ|`, not `|S|`: cancellation grows the *relative* error,
+not the absolute. For a result in `|S|` (correctly rounded) use `shewchuckSum`
+or `superSum`; for one between the two — *faithful*, no float lies between the
+result and the exact sum — use `accSum` (Rump Alg 4.5), and for the exact
+round-to-nearest use `nearSum` (Rump Alg 7.4):
+
+    accSum:  < 2·eps·ufp(result)        faithful, 1 ulp (Rump Alg 4.5)
+    nearSum: ½ ulp(fl(Σ xᵢ))            correctly rounded (Rump Alg 7.4)
+
+`accSum` runs Rump's `Transform` repeat-until over `ExtractVector`; runtime grows
+with `log₂(cond(sum))`. `nearSum` runs it once for a faithful result and the
+residual, then resolves the rounding direction with a second `TransformK(p',
+R − δ')` offset to the midpoint between the two candidate floats (Lemma 7.3):
+its sign picks predecessor / result / successor, and the zero case is the exact
+tie. The correctly-rounded guarantee holds under `2^(2M)·eps ≤ 1` (`M =
+⌈log₂(n+2)⌉`): `n ≤ 6.7e7` (float64), `n ≤ 4094` (float32).
+
+`conditionNumber` reports `cond(sum) = Σ|xᵢ| / |Σxᵢ|` (Higham 2002, §4.1): `1`
+for a no-cancellation sum, large under catastrophic cancellation, `+inf` when the
+sum is exactly `0` or `Σ|xᵢ|` overflows, `0` for empty input — the quantity the
+ORO/Rump bounds are stated in.
+
+Non-finite input or a `sigma0` overflow (input near the float max, where the sum
+itself overflows) falls back to `superSum`, which is correctly rounded and so
+still faithful — finite inputs never yield NaN. There is no SIMD kernel — the
+sequential cascade does not vectorize — so under `-d:simd` the C ABI dispatches
+to the scalar algorithm (ADR-0007).
+"""
+
+nbCode:
+  let tenths = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+  echo "sum2   (0.1x10) = ", sum2(tenths)
+  echo "sumK K=2         = ", sumK(tenths, 2)
+  echo "accSum           = ", accSum(tenths)
+  echo "nearSum          = ", nearSum(tenths)
+  echo "cond (magnitude) = ", conditionNumber([1.0, 1e100, 1.0, -1e100])
+
+nbText: """
+The C ABI exposes `ua_sum_oro` / `ua_sum_acc` / `ua_sum_near` / `ua_sum_k` /
+`ua_condition_number` and Python exposes `oro_sum` / `acc_sum` / `near_sum` /
+`sum_k` / `condition_number`.
+
+### References
+
+- Ogita, T., Rump, S.M., Oishi, S. (2005). "Accurate Sum and Dot Product".
+  *SIAM J. Sci. Comput.* 26(6), 1950–1988. doi:10.1137/S0036142903448029 —
+  the `transform` (Vecsum, Alg 4.6), `sum2` (Alg 4.1), `sumK` (Alg 4.8).
+- Rump, S.M. (2008). "Accurate summation". *Numer. Math.* 110, 385–404.
+  doi:10.1007/s00211-008-0144-z — `accSum` (Alg 4.5), `nearSum` (Alg 7.4),
+  `ExtractVector` / `Transform` / `TransformK`, Lemmas 6.3 and 7.3.
+- Higham, N.J. (2002). *Accuracy and Stability of Numerical Algorithms*,
+  2nd ed., §4.1–4.3. SIAM. ISBN 978-0-89871-521-7 — `cond(sum)`, the `γ_k`
+  forward bounds.
+"""
+
+nbText: """
 ## The C ABI
 
 The same entry point, reachable from anything that speaks C. The header is
