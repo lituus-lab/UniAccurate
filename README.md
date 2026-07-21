@@ -15,11 +15,11 @@ src/UniAccurate/algorithms/  summation kernels (NimContracts)
 src/UniAccurate/simd.nim     SIMD kernels, gated by `-d:simd` (AVX-512/AVX2/NEON)
 src/UniAccurate/c_api.nim    C ABI
 include/UniAccurate.h        hand-written C header
-tests/test_*.nim             Nim tests (eft, sums, compensated, shewchuk, exact, oro, property, simd)
+tests/test_*.nim             Nim tests (eft, sums, compensated, shewchuk, exact, oro, dot, property, simd)
 tests/c/                     C ABI test (links the header against the lib)
 examples/                    Nim + C demos
 py/                          Cython binding + pytest
-ADRs/                        0001 optional deps, 0002 license, 0003 C ABI & Python, 0004 FMA, 0005 SIMD
+ADRs/                        0001 optional deps, 0002 license, 0003 C ABI & Python, 0004 FMA, 0005 SIMD, 0006 new algos
 .github/workflows/ci.yml     3-OS Nim matrix + C ABI + Python + SIMD
 ```
 
