@@ -52,6 +52,9 @@ task exact, "Exact superaccumulator tests (debug, contracts active)":
 task oro, "ORO/Rump summation tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_oro tests/test_orosum.nim"
 
+task dot, "Dot product tests (debug, contracts active)":
+  exec "nim c -r --path:src -o:build/test_dot tests/test_dotproduct.nim"
+
 task prop, "Randomized property tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_prop tests/test_property.nim"
 
@@ -62,6 +65,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nimble shewchuk"
   exec "nimble exact"
   exec "nimble oro"
+  exec "nimble dot"
   exec "nimble prop"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
@@ -72,6 +76,7 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
@@ -81,6 +86,7 @@ task testCi, "Nim tests (CI subset, debug)":
   exec "nimble shewchuk"
   exec "nimble exact"
   exec "nimble oro"
+  exec "nimble dot"
   exec "nimble prop"
 
 task testCiRelease, "Nim tests (CI subset, release)":
@@ -91,6 +97,7 @@ task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_shewchuk_rel tests/test_shewchuksum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
 task testAll, "debug + release + C ABI":
@@ -168,6 +175,8 @@ task testSimd, "Scalar Nim tests compiled under -d:simd (host ISA)":
        " --path:src -o:build/test_exact_simd tests/test_exactsum.nim"
   exec "nim c -r -d:simd" & simdArch &
        " --path:src -o:build/test_oro_simd tests/test_orosum.nim"
+  exec "nim c -r -d:simd" & simdArch &
+       " --path:src -o:build/test_dot_simd tests/test_dotproduct.nim"
   exec "nim c -r -d:simd" & simdArch &
        " --path:src -o:build/test_prop_simd tests/test_property.nim"
 

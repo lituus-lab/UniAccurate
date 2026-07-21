@@ -50,6 +50,18 @@ proc randomIntF64(r: var uint64): float64 =
   let v = int64(next(r) mod 2_000_001) - 1_000_000
   float64(v)
 
+proc randomBigMagF64(r: var uint64): float64 =
+  ## float64 with a large exponent (exp in [1020, 1023]) and a random sign —
+  ## finite, but products of two overflow and opposite-sign products cancel,
+  ## the dot analogue of the overflow-prone sum suite. Stays below the float32
+  ## top so the f32 suite shares it.
+  let expField = uint64(next(r) mod 4 + 1020)
+  var bits = expField shl 52
+  bits = bits or (next(r) and 0x000F_FFFF_FFFF_FFFF'u64)
+  if (next(r) and 1) == 1:
+    bits = bits or (1'u64 shl 63) # negative
+  cast[float64](bits)
+
 const Seed = 0x9E37_79B9_7F4A_7C15'u64
 
 suite "finite inputs never yield NaN (no overflow)":
@@ -139,3 +151,67 @@ suite "float32 compensated finite never NaN":
       check classify(sumK(x, 2)) != fcNan
       check classify(accSum(x)) != fcNan
       check classify(nearSum(x)) != fcNan
+
+suite "dot product: finite inputs never yield NaN (no overflow)":
+  var r = Seed xor 4
+  test "naive/dot2/dotK, bounded random float64 up to n=100000":
+    for n in [1, 2, 3, 10, 100, 1000, 10000, 100000]:
+      var x = newSeq[float64](n)
+      var y = newSeq[float64](n)
+      for i in 0 ..< n:
+        x[i] = randomF64(r)
+        y[i] = randomF64(r)
+      check classify(naiveDot(x, y)) != fcNan
+      check classify(dot2(x, y)) != fcNan
+      check classify(dotK(x, y, 2)) != fcNan
+      check classify(dotK(x, y, 3)) != fcNan
+      check classify(dotK(x, y, 5)) != fcNan
+
+suite "dot product: finite inputs never yield NaN (overflow-prone)":
+  # Products of two big finite values overflow to ±Inf; opposite-sign ±Inf
+  # products can combine to NaN (a summation-order artifact). naiveDot recovers
+  # via superDot on the all-finite NaN; dot2/dotK fall back to naiveDot (hence
+  # superDot) on a non-finite intermediate, so finite input never yields NaN.
+  var r = Seed xor 5
+  test "naive/dot2/dotK, signed big float64 up to n=10000":
+    for n in [1, 10, 100, 1000, 10000]:
+      var x = newSeq[float64](n)
+      var y = newSeq[float64](n)
+      for i in 0 ..< n:
+        x[i] = randomBigMagF64(r)
+        y[i] = randomBigMagF64(r)
+      check classify(naiveDot(x, y)) != fcNan
+      check classify(dot2(x, y)) != fcNan
+      check classify(dotK(x, y, 2)) != fcNan
+      check classify(dotK(x, y, 3)) != fcNan
+
+suite "dot product: exact integer data agrees across all K":
+  var r = Seed xor 6
+  test "naive == dot2 == dotK(1..5) == superDot on integer-valued input":
+    for n in [1, 2, 3, 10, 100, 500]:
+      var x = newSeq[float64](n)
+      var y = newSeq[float64](n)
+      for i in 0 ..< n:
+        x[i] = randomIntF64(r)
+        y[i] = randomIntF64(r)
+      let want = naiveDot(x, y)
+      check dot2(x, y) == want
+      check dotK(x, y, 1) == want
+      check dotK(x, y, 2) == want
+      check dotK(x, y, 3) == want
+      check dotK(x, y, 5) == want
+      check superDot(x, y) == want # exact reference
+
+suite "float32 dot product finite never NaN":
+  var r = Seed xor 7
+  test "naive/dot2/dotK, bounded random float32 up to n=10000":
+    for n in [1, 10, 100, 1000, 10000]:
+      var x = newSeq[float32](n)
+      var y = newSeq[float32](n)
+      for i in 0 ..< n:
+        x[i] = randomF32(r)
+        y[i] = randomF32(r)
+      check classify(naiveDot(x, y)) != fcNan
+      check classify(dot2(x, y)) != fcNan
+      check classify(dotK(x, y, 2)) != fcNan
+      check classify(dotK(x, y, 3)) != fcNan
