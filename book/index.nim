@@ -192,19 +192,23 @@ Compensation drives the *leading-order* error to zero; `shewchukSum` drives
 the *entire* error to a single rounding. It accumulates each addend into a
 non-overlapping, magnitude-ascending expansion with `twoSum`, then collapses
 that expansion once under round-to-nearest-even — the exact real sum `Σ xᵢ`
-rounded to the working precision. This is the strongest accuracy a
-fixed-precision sum can offer: the result equals Python's `math.fsum`
-bit-for-bit on float64. `fsum` is an alias.
+rounded to the working precision, for finite non-overflowing input. This is the
+strongest accuracy a fixed-precision sum can offer: on such input the result
+matches Python's `math.fsum` bit-for-bit on the tested platforms; the
+correctness reference is the exact-rational oracle in `py/tests`. `fsum` is an
+alias.
 
 The forward bound is the round-to-nearest bound itself, half a unit in the last
 place of the rounded result:
 
-    shewchukSum:  ½ ulp(fl(Σ xᵢ))
+    shewchukSum:  ½ ulp(fl(Σ xᵢ))    (finite result; zero is exact, subnormals use the subnormal ulp)
 
 so the error is bounded in `|S|`, not `Σ|xᵢ|`: cancellation does not grow it.
 Correct rounding holds only while every partial stays finite; a non-finite
 addend or an intermediate overflow abandons the exact expansion and falls back
-to a naive IEEE sum (NaN/±Inf propagate; finite inputs never yield NaN).
+to a naive IEEE sum — the result is then a correctly-signed ±Inf (or NaN for
+`+Inf + −Inf`), not a correctly-rounded finite value. Finite inputs never yield
+NaN.
 """
 
 nbCode:
