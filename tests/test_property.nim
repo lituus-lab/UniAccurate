@@ -27,6 +27,16 @@ proc randomF64(r: var uint64): float64 =
   bits = bits or (next(r) and 0x000F_FFFF_FFFF_FFFF'u64)
   cast[float64](bits)
 
+proc randomDotF64(r: var uint64): float64 =
+  ## Finite float64 for the no-overflow dot suite: exponent halved (unbiased
+  ## [-255, 244]) so products stay finite (unbiased <= 488) and the running sum
+  ## of up to 1e5 of them (unbiased <= 505) never overflows. `randomF64` doubles
+  ## the exponent on the product, so it is unsafe for dot at scale.
+  let expField = uint64(next(r) mod 500 + 768)
+  var bits = expField shl 52
+  bits = bits or (next(r) and 0x000F_FFFF_FFFF_FFFF'u64)
+  cast[float64](bits)
+
 proc randomSignedBigF64(r: var uint64): float64 =
   ## float64 near the top of the range (exp in [1017, 1023]) with a random
   ## sign. Summing many overflows; mixed signs let a subtree hit +Inf or -Inf.
@@ -40,6 +50,17 @@ proc randomSignedBigF64(r: var uint64): float64 =
 proc randomF32(r: var uint64): float32 =
   ## Finite normal float32, exponent in [-62, 63]: no under/overflow, no NaN.
   let expField = uint32(next(r) mod 126 + 65)
+  var bits = expField shl 23
+  bits = bits or (uint32(next(r)) and 0x007F_FFFF'u32)
+  cast[float32](bits)
+
+proc randomDotF32(r: var uint64): float32 =
+  ## Finite float32 for the dot suite: exponent halved (unbiased [-29, 30]) so
+  ## products stay finite (unbiased <= 60) and the running sum of up to 1e4 of
+  ## them (unbiased <= 74) never overflows the float32 range. `randomF32`
+  ## products fit but its 1e4-term running sum can overflow, so it is unsafe for
+  ## dot at scale.
+  let expField = uint32(next(r) mod 60 + 98)
   var bits = expField shl 23
   bits = bits or (uint32(next(r)) and 0x007F_FFFF'u32)
   cast[float32](bits)
@@ -147,8 +168,8 @@ suite "dot product: finite inputs never yield NaN (no overflow)":
       var x = newSeq[float64](n)
       var y = newSeq[float64](n)
       for i in 0 ..< n:
-        x[i] = randomF64(r)
-        y[i] = randomF64(r)
+        x[i] = randomDotF64(r)
+        y[i] = randomDotF64(r)
       check classify(naiveDot(x, y)) != fcNan
       check classify(dot2(x, y)) != fcNan
       check classify(dotK(x, y, 2)) != fcNan
@@ -199,8 +220,8 @@ suite "float32 dot product finite never NaN":
       var x = newSeq[float32](n)
       var y = newSeq[float32](n)
       for i in 0 ..< n:
-        x[i] = randomF32(r)
-        y[i] = randomF32(r)
+        x[i] = randomDotF32(r)
+        y[i] = randomDotF32(r)
       check classify(naiveDot(x, y)) != fcNan
       check classify(dot2(x, y)) != fcNan
       check classify(dotK(x, y, 2)) != fcNan
