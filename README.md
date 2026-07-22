@@ -19,7 +19,7 @@ tests/test_*.nim             Nim tests (eft, sums, compensated, shewchuk, exact,
 tests/c/                     C ABI test (links the header against the lib)
 examples/                    Nim + C demos
 py/                          Cython binding + pytest
-ADRs/                        0001 optional deps, 0002 license, 0003 C ABI & Python, 0004 FMA, 0005 SIMD, 0006 new algos
+ADRs/                        0001 optional deps, 0002 license, 0003 C ABI & Python, 0004 FMA, 0005 SIMD, 0006 new algos, 0007 perf levers
 .github/workflows/ci.yml     3-OS Nim matrix + C ABI + Python + SIMD
 ```
 

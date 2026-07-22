@@ -25,8 +25,8 @@ the inspiration):
    SIMD kernel. `superDot` is the finite-input NaN fallback for the dot family.
 3. **`sum2` / `sumK` / `accSum` / `nearSum` / `conditionNumber`** —
    Ogita–Rump–Oishi (2005) and Rump (2008): the online cascaded transform
-   (`sum2` delegates to `neumaierSum`; `sumK` is the O(1)-space single-pass
-   `VecSum` distillation), Rump's faithful `accSum` and correctly-rounded
+   (`sum2` delegates to `neumaierSum`; `sumK` is the cascaded `VecSum` distillation
+   with an O(n) working buffer), Rump's faithful `accSum` and correctly-rounded
    `nearSum`, and the `cond(sum)` diagnostic. No FMA, no SIMD kernel.
 4. **`naiveDot` / `dot2` / `dotK`** — ORO Algorithm 5.3 via `twoProductFMA` +
    `twoSum`; `dotK` is the online (K−1)-fold cascade. FMA and SIMD kernels

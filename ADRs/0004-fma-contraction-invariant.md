@@ -30,6 +30,8 @@ SIGILL on a non-FMA CPU. libm `fma` stays correctly-rounded with or without it.
 ## Invariants
 
 1. `-ffp-contract=off` on every GCC/Clang build path (amd64, arm64, others).
-2. `-mfma` is never the default; only `-d:useFMA` (amd64) enables it.
+2. `-mfma` is enabled only by `-d:useFMA` (amd64) or by `-d:simd` with
+   `-d:avx2`/`-d:avx512` (every AVX2 CPU, Haswell+, has FMA, so the SIMD target
+   flags carry `-mfma`); never on a default scalar build.
 3. `-d:scalarUniAccurate` opts out of both for a scalar, flag-free build.
 4. MSVC builds receive neither flag; `/fp:precise` is the invariant there.

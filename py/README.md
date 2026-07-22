@@ -3,7 +3,7 @@
 # uniaccurate — Python binding
 
 ```bash
-nimble clib                                              # build libUniAccurate.so
+nimble pyLib                                             # build the shared lib the extension links against (.so / .dylib / .dll per OS)
 cd py && python3 setup.py build_ext --inplace            # build extension
 cd py && python3 -m pytest -q                            # test
 ```

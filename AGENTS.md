@@ -17,7 +17,7 @@ nimble docs       # nimib book + API reference -> pages/ (needs nimib)
 `nimble docs` needs a complete Nim distribution: `--project` builds `dochack`,
 which Homebrew's `nim` omits (no `tools/`). choosenim and the CI action ship it.
 
-CI: 3-OS Nim matrix + C ABI (linux/macOS) + Python + SIMD (ubuntu AVX2, macOS NEON).
+CI: 3-OS Nim matrix + C ABI + Python (ubuntu/macOS/Windows) + SIMD (ubuntu AVX2, macOS NEON).
 
 ## Testing
 

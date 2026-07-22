@@ -24,16 +24,16 @@ SIMD-block, scalar-merge scheme. `naive` and `pairwise` carry no reliability
 flag; `pairwise` reuses `PairwiseThreshold` with a SIMD naive base case.
 
 ISA selection is compile-time, by `defined(avx512)` / `defined(avx2)` /
-`defined(arm64)` — nimsimd branches on the same defines. `config.nims` adds the
-matching `-mavx512f` / `-mavx2` (or `/arch:AVX512` / `/arch:AVX2` under MSVC);
-arm64 needs nothing, NEON is the base ISA. `-d:scalarUniAccurate` opts out.
+`defined(arm64)` — nimsimd branches on the same defines. `config.nims` adds the matching `-mavx512f -mfma` / `-mavx2 -mfma` (or
+`/arch:AVX512` / `/arch:AVX2` under MSVC, which implies FMA); arm64 needs
+nothing, NEON-FMA is the base ISA. `-d:scalarUniAccurate` opts out.
 
 **Dispatch lives at the top, not in the algorithms.** The vgraph forbids a
 back-edge `algorithms → simd`, so unlike a flat library UniAccurate cannot
 dispatch SIMD inside an algorithm module. The umbrella exports the `*Simd`
 procs under `-d:simd` (Nim users opt in explicitly; the scalar `naiveSum` etc.
 stay scalar), and the C ABI dispatches each `ua_sum_*` through the SIMD kernel
-with a scalar fallback. The C header is unchanged (same 8 `ua_*` symbols).
+with a scalar fallback. The C header is unchanged (SIMD adds no `ua_*` symbols).
 
 **Reliability and fallback.** A compensated SIMD result is `(T, bool)`:
 `reliable = isFin(r) and maxLane <= LaneConcentrationFallback * abs(r)` with
@@ -52,7 +52,9 @@ only on amd64 AVX2/AVX-512. On arm64 the C ABI stays scalar even with
 **No FMA in v1.** ADR-0004 forbids FMA inside the compensated recurrence, and
 v1 has no dot product, so the layer uses no FMA at all. The dot-product kernels
 that would use FMA are deferred to a later task; ADR-0004 still applies when
-they arrive. `-ffp-contract=off` from `config.nims` is unchanged.
+they arrive. `-ffp-contract=off` from `config.nims` is unchanged. *Superseded
+by ADR-0007: the SIMD dot kernels (`naiveDotSimd`/`dot2Simd`/`dotK3Simd`) now
+use FMA intrinsics; the compensated-recurrence FMA ban (ADR-0004) stands.*
 
 ## Invariants
 
@@ -63,5 +65,7 @@ they arrive. `-ffp-contract=off` from `config.nims` is unchanged.
 3. `simdF64Enabled` is false on arm64; the C ABI falls back to scalar there.
 4. Compensated SIMD returns `(T, bool)` and the C ABI falls back to the scalar
    algorithm when `reliable = false`.
-5. No FMA in the layer until the dot-product kernels land (ADR-0004).
-6. `-d:scalarUniAccurate` disables the layer alongside the FMA flags.
+5. No FMA in the compensated-sum recurrence; the SIMD dot kernels (ADR-0007)
+   use FMA intrinsics.
+6. `-d:scalarUniAccurate` opts out of the FMA and `-mavx*` flags; do not pair it
+   with `-d:simd` (the umbrella still imports `simd.nim` under `-d:simd` alone).
