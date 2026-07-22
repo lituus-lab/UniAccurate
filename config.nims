@@ -32,7 +32,7 @@ when not defined(scalarUniAccurate):
 ## select the amd64 ISA (nimsimd branches on them). arm64 NEON is base ISA.
 when defined(simd) and not defined(scalarUniAccurate):
   when defined(amd64):
-    # The SIMD dot kernels use FMA intrinsics (mm{256,512}_fmadd_pd, ADR-0007),
+    # The SIMD dot kernels use FMA intrinsics (mm{256,512}_fmadd_pd, ADR-0007 Lever 1),
     # so the amd64 target flags must enable FMA too. -mfma is portable alongside
     # -mavx2/-mavx512f: every AVX2 CPU (Haswell+) has FMA. arm64 NEON has FMA in
     # the base ISA, so no flag there.

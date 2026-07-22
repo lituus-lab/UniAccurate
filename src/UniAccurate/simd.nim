@@ -29,8 +29,8 @@
 ## regardless of lane concentration.
 ##
 ## FMA is used only in the dot product (the product `xᵢ·yᵢ` and its error
-## extraction) — never in the compensated sum recurrence (ADR-0005); the
-## FMA-in-SIMD-dot piece ADR-0006 deferred lands here (ADR-0007). nimsimd is
+## extraction) — never in the compensated sum recurrence (ADR-0004); the
+## FMA-in-SIMD-dot piece ADR-0005 deferred lands here (ADR-0007 Lever 1). nimsimd is
 ## imported inside the ISA branches only, so a scalar build (no `-d:simd`) never
 ## pulls it.
 when defined(simd):
