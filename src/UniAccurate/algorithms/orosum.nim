@@ -81,8 +81,9 @@ func transform[T: SomeFloat](x: openArray[T], err: var seq[T],
   ##
   ## `useFastTwoSum` swaps the per-step `twoSum` (6 branchless FLOPs) for the
   ## branched `twoSumFast` (3 FLOPs + 1 magnitude branch). Both yield the same
-  ## `(s, e)` EFT, so the transform is bit-identical either way — a throughput
-  ## lever, not an accuracy one. The branch is well-predicted when the running
+  ## `(s, e)` EFT in value, so the transform is value-identical either way
+  ## (only the sign of a zero error may differ) — a throughput lever, not an
+  ## accuracy one. The branch is well-predicted when the running
   ## `result` dominates its addends (the common cascade shape), and a loss where
   ## `|result|` vs `|x[i]|` flips often (cancellation data with comparable
   ## addends); the flag lets `sumK` pick per workload.
@@ -149,9 +150,9 @@ func sumK*[T: SomeFloat](x: openArray[T], K: int,
   ##
   ## `useFastTwoSum` threads into every `transform` pass: the branched Dekker
   ## `twoSumFast` (3 FLOPs + 1 branch) replaces the branchless `twoSum` (6
-  ## FLOPs). Bit-identical to the default — both are the addition EFT — so the
-  ## bound above holds unchanged; only the throughput shape differs (see
-  ## `transform`). Default off: the branchless form wins on cancellation data.
+  ## FLOPs). Value-identical to the default — both are the addition EFT, so the
+  ## bound above holds unchanged; only the sign of a zero error may differ, and
+  ## only the throughput shape differs (see `transform`). Default off: the branchless form wins on cancellation data.
   ##
   ## `assumeFinite` threads into `transform` (dropping its per-step `isFin`
   ## guard) and drops the cascade's `isFin(result)` compensation guard. Bit-
