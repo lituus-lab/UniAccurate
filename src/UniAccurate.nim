@@ -23,4 +23,4 @@ when defined(simd):
   import UniAccurate/simd
   export simd
 
-const UniAccurateVersion* = "0.1.0"
+const UniAccurateVersion* = "0.1.1"
