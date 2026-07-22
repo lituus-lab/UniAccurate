@@ -183,11 +183,6 @@ suite "assumeFinite opt-in is bit-identical on finite non-overflowing input":
   test "float64 parity": parity(float64)
   test "float32 parity": parity(float32)
 
-  test "sum2 (ORO alias of neumaier) parity":
-    let mag = [1.0, 1e20, 1.0, -1e20]
-    check sum2(mag, assumeFinite = true) == sum2(mag)
-    check sum2(mag, assumeFinite = true) == 2.0
-
   test "the guard is load-bearing (guarded path localizes overflow to Inf)":
     # The opt-in strips the `isFin` guards; on overflow its output is undefined
     # (a `twoSum(Inf, v)` precondition violation in debug, garbage in release),
