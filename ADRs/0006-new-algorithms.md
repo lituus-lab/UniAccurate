@@ -28,7 +28,6 @@ the inspiration):
    (`sum2` delegates to `neumaierSum`; `sumK` is the cascaded `VecSum` distillation
    with an O(n) working buffer), Rump's faithful `accSum` and correctly-rounded
    `nearSum`, and the `cond(sum)` diagnostic. No FMA, no SIMD kernel.
-4. **`naiveDot` / `dot2` / `dotK`** — ORO Algorithm 5.3 via `twoProductFMA` +
    `twoSum`; `dotK` is the online (K−1)-fold cascade. FMA and SIMD kernels
    ship for this family.
 

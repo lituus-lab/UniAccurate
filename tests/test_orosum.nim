@@ -135,10 +135,10 @@ template oroSuite(T: typedesc) =
       let m = maxFin(T)
       check classify(sumK([m, m, m], 2)) == fcInf
 
-    test "sumK: useFastTwoSum is bit-identical to the default (the EFT swap)":
-      # twoSumFast yields the same (s, e) as twoSum, so the cascaded transform is
-      # bit-identical — checked on integer-exact, 0.1×10, magnitude-robust, and
-      # mixed-magnitude random data, for K in {1, 2, 3}.
+    test "sumK: useFastTwoSum is value-identical to the default (the EFT swap)":
+      # twoSumFast yields the same (s, e) as twoSum in value, so the cascade is
+      # value-identical — checked with `==` (+0 == -0) on integer-exact, 0.1×10,
+      # magnitude-robust, and mixed-magnitude random data, for K in {1, 2, 3}.
       let ints = [T(1.0), T(2.0), T(3.0), T(4.0), T(5.0), T(6.0)]
       let tenths = [T(0.1), T(0.1), T(0.1), T(0.1), T(0.1),
                     T(0.1), T(0.1), T(0.1), T(0.1), T(0.1)]

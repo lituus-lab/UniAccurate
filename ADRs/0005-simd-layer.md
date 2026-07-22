@@ -49,12 +49,12 @@ only on amd64 AVX2/AVX-512. On arm64 the C ABI stays scalar even with
 `-d:simd`; NEON is exercised through the float32 Nim tests
 (`simdF32Enabled = simdF64Enabled or defined(arm64)`).
 
-**No FMA in v1.** ADR-0004 forbids FMA inside the compensated recurrence, and
-v1 has no dot product, so the layer uses no FMA at all. The dot-product kernels
-that would use FMA are deferred to a later task; ADR-0004 still applies when
-they arrive. `-ffp-contract=off` from `config.nims` is unchanged. *Superseded
-by ADR-0007: the SIMD dot kernels (`naiveDotSimd`/`dot2Simd`/`dotK3Simd`) now
-use FMA intrinsics; the compensated-recurrence FMA ban (ADR-0004) stands.*
+**No FMA at v1 (historical).** ADR-0004 forbids FMA inside the compensated
+recurrence, and v1 shipped without a dot product, so the layer used no FMA at
+the time; the dot-product kernels that would use FMA were deferred. They
+arrived in ADR-0007: the SIMD dot kernels (`naiveDotSimd`/`dot2Simd`/`dotK3Simd`)
+now use FMA intrinsics, while the compensated-recurrence FMA ban (ADR-0004)
+still stands. `-ffp-contract=off` from `config.nims` is unchanged.
 
 ## Invariants
 

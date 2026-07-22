@@ -11,7 +11,7 @@ products, in Nim, with a hand-written C ABI and a Cython Python binding.
 ```
 src/UniAccurate.nim          umbrella module
 src/UniAccurate/twosum.nim   error-free transforms (NimContracts)
-src/UniAccurate/algorithms/  summation kernels (NimContracts)
+src/UniAccurate/algorithms/  summation and dot-product kernels (NimContracts)
 src/UniAccurate/simd.nim     SIMD kernels, gated by `-d:simd` (AVX-512/AVX2/NEON)
 src/UniAccurate/c_api.nim    C ABI
 include/UniAccurate.h        hand-written C header
