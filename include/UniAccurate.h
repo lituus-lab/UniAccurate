@@ -95,7 +95,7 @@ double ua_dot_k(const double *x, const double *y, size_t n, int k);
  * ua_sum_neumaier. Empty input (n == 0, x may be NULL) is 0. NaN/Inf propagate;
  * finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
  * Single-threaded, reentrant. Null x with n > 0 is undefined. No SIMD kernel —
- * scalar under -d:simd (ADR-0007). */
+ * scalar under -d:simd (ADR-0006). */
 double ua_sum_oro(const double *x, size_t n);
 
 /* Rump NearSum (Alg 7.4) — the correctly-rounded sum, the round-to-nearest of
@@ -103,7 +103,7 @@ double ua_sum_oro(const double *x, size_t n);
  * NaN/Inf propagate (non-finite input or a sigma0 overflow falls back to the
  * exact superaccumulator); finite inputs never yield NaN (overflow ⇒ ±Inf).
  * Never raises. Single-threaded, reentrant. Null x with n > 0 is undefined. No
- * SIMD kernel — scalar under -d:simd (ADR-0007). */
+ * SIMD kernel — scalar under -d:simd (ADR-0006). */
 double ua_sum_near(const double *x, size_t n);
 
 /* Rump AccSum (Alg 4.5) — a faithful rounding of the exact sum (within 1 ulp).
@@ -111,7 +111,7 @@ double ua_sum_near(const double *x, size_t n);
  * or a sigma0 overflow falls back to the exact superaccumulator); finite inputs
  * never yield NaN (overflow ⇒ ±Inf). Never raises. Single-threaded, reentrant.
  * Null x with n > 0 is undefined. No SIMD kernel — scalar under -d:simd
- * (ADR-0007). */
+ * (ADR-0006). */
 double ua_sum_acc(const double *x, size_t n);
 
 /* ORO SumK (Alg 4.8) — K-fold cascaded compensated sum: K=1 naive, K=2
@@ -119,7 +119,7 @@ double ua_sum_acc(const double *x, size_t n);
  * k < 1 is treated as 1. Empty input (n == 0, x may be NULL) is 0. NaN/Inf
  * propagate; finite inputs never yield NaN (overflow ⇒ ±Inf). Never raises.
  * Single-threaded, reentrant. Null x with n > 0 is undefined. No SIMD kernel —
- * scalar under -d:simd (ADR-0007). */
+ * scalar under -d:simd (ADR-0006). */
 double ua_sum_k(const double *x, size_t n, int k);
 
 /* Condition number of the sum, cond = Σ|xᵢ| / |Σxᵢ|: 1 for a no-cancellation

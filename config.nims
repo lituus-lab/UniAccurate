@@ -9,7 +9,7 @@
 ##      the Dekker error identity of `twoProduct` (the `ah*bh - result[0]`
 ##      term must round separately). clang contracts by default on both amd64
 ##      and arm64, so the guard is applied on both. This is the FMA contract
-##      invariant (ADR-0005). GCC does not contract by default and MSVC's
+##      invariant (ADR-0004). GCC does not contract by default and MSVC's
 ##      `/fp:precise` already forbids it (and would not understand the flag),
 ##      so the switch is GCC/Clang-only.
 ##

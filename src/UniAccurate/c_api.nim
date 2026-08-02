@@ -131,7 +131,7 @@ proc ua_sum_shewchuk(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## `0`. Never raises; NaN/Inf propagate. An intermediate overflow abandons the
   ## exact expansion and yields a correctly-signed ±Inf (finite input never
   ## yields NaN). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar
-  ## under `-d:simd` (ADR-0007).
+  ## under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -143,7 +143,7 @@ proc ua_sum_exact(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## superaccumulator (integer exact accumulation, single final rounding). Empty
   ## input is `0`. Never raises; NaN/Inf propagate. Finite inputs never yield NaN
   ## (true overflow ⇒ ±Inf, opposite-sign overflow cancels exactly). Null `x`
-  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -156,7 +156,7 @@ proc ua_dot_exact(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Empty input is `0`. Never raises; NaN/Inf operands propagate. Finite operands
   ## never yield NaN (products held at true magnitude, opposite-sign overflow
   ## cancels exactly). Null `x` or `y` with `n > 0` is undefined. No SIMD kernel —
-  ## scalar under `-d:simd` (ADR-0007).
+  ## scalar under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -247,7 +247,7 @@ proc ua_sum_oro(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## ORO `sum2` (Alg 4.1) — the magnitude-robust compensated sum, value-identical
   ## to `neumaierSum`. Empty input is `0`. Never raises; NaN/Inf propagate.
   ## Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is
-  ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -259,7 +259,7 @@ proc ua_sum_near(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## of the exact `Σ xᵢ` bit-for-bit. Empty input is `0`. Never raises; NaN/Inf
   ## propagate (non-finite input or a `sigma0` overflow falls back to the exact
   ## superaccumulator). Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x`
-  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -272,7 +272,7 @@ proc ua_sum_acc(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## (non-finite input or a `sigma0` overflow falls back to the exact
   ## superaccumulator, which is correctly-rounded and so still faithful). Finite
   ## inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is undefined.
-  ## No SIMD kernel — scalar under `-d:simd` (ADR-0007).
+  ## No SIMD kernel — scalar under `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -285,7 +285,7 @@ proc ua_sum_k(x: ptr cdouble; n: csize_t; k: cint): cdouble {.raises: [].} =
   ## second-order (≈ `kleinSum`); `k < 1` is treated as 1. Empty input is `0`.
   ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN (overflow ⇒
   ## ±Inf). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar under
-  ## `-d:simd` (ADR-0007).
+  ## `-d:simd` (ADR-0006).
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)

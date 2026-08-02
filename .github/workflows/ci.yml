@@ -309,7 +309,7 @@ jobs:
   bench:
     name: Bench smoke (${{ matrix.os }})
     # Correctness/non-regression smoke on reduced sizes, not the AVX-512
-    # reference numbers from ADR-0008 -- GitHub runners are not guaranteed
+    # reference numbers from ADR-0007 -- GitHub runners are not guaranteed
     # AVX-512 hardware, that comparison stays a manual FreeBSD/Zen4 check.
     runs-on: ${{ matrix.os }}
     strategy:

@@ -228,7 +228,7 @@ where `kahanSum` lost it.
 The C ABI exposes `ua_sum_shewchuk` and Python exposes `shewchuk_sum` (and
 `fsum` is Nim-only). There is no SIMD kernel: the sequential expansion does not
 vectorize, so under `-d:simd` the C ABI dispatches this symbol to the scalar
-algorithm (documented in ADR-0007).
+algorithm (documented in ADR-0006).
 
 ### References
 
@@ -272,7 +272,7 @@ family relies on.
 Both fall back to IEEE propagation on a non-finite addend or a genuine overflow
 past the accumulator's range (finite inputs never yield NaN). There is no SIMD
 kernel — the integer chunk sweep does not vectorize — so under `-d:simd` the C
-ABI dispatches to the scalar algorithm (ADR-0007).
+ABI dispatches to the scalar algorithm (ADR-0006).
 """
 
 nbCode:
@@ -339,7 +339,7 @@ Non-finite input or a `sigma0` overflow (input near the float max, where the sum
 itself overflows) falls back to `superSum`, which is correctly rounded and so
 still faithful — finite inputs never yield NaN. There is no SIMD kernel — the
 sequential cascade does not vectorize — so under `-d:simd` the C ABI dispatches
-to the scalar algorithm (ADR-0007).
+to the scalar algorithm (ADR-0006).
 """
 
 nbCode:
