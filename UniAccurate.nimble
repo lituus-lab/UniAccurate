@@ -2,7 +2,7 @@
 # Copyright 2026 lituus-lab
 # UniAccurate — error-free transforms and accurate summation/dot-product.
 
-version = "0.1.1"
+version = "1.0.0"
 author = "lituus-lab"
 description = "Error-free transforms and accurate summation/dot-product (Nim + C-ABI + Python)"
 license = "Apache-2.0"

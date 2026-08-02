@@ -5,7 +5,7 @@
 import std/math
 import ../UniAccurate
 
-const UniAccurateVersionC: cstring = "0.1.0"
+const UniAccurateVersionC: cstring = "1.0.0"
 
 # Unmangled C symbols, C calling convention, exported from the shared lib.
 {.push exportc, cdecl, dynlib.}
