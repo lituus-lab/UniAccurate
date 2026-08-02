@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Ported from the accuratesums reference harness (MIT); the MPFR subprocess
+# oracle was dropped -- accuracy is computed by the Nim aggregator against a
+# single in-process superSum/superDot oracle. This driver emits timing +
+# candidate result bit-patterns only.
+[package]
+name = "driver_rust"
+version = "0.0.1"
+edition = "2021"
+
+[features]
+# `fma` is a passthrough to the `accurate` crate's `fma` feature (mul_add in
+# two_product). Default on; `cargo run --release --no-default-features` builds
+# the FMA-off column from the same manifest.
+default = ["fma"]
+fma = ["accurate/fma"]
+
+[dependencies]
+# default-features = false drops `rayon` (parallel) for a fair single-thread
+# column; the sum/dot accumulator types are core, not behind a feature.
+accurate = { version = "0.4", default-features = false }
+
+[[bin]]
+name = "driver_rust"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3

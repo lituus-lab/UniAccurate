@@ -46,6 +46,15 @@ py/.pytest_cache/
 tests/c/test_uniaccurate
 examples/c/demo
 
+# bench harness: sources tracked, generated data/results/binaries not
+bench/aggregate
+bench/driver_nim
+bench/export_datasets
+bench/originals/driver_originals
+bench/canonical/
+bench/compare/
+bench/rust/target/
+
 # os / editor
 .DS_Store
 *~
