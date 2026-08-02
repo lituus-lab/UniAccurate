@@ -35,12 +35,16 @@ nimdoc.out.css
 # python binding artifacts (sources tracked; generated + bundled lib not)
 py/uniaccurate/_core.c
 py/uniaccurate/*.so
-py/uniaccurate/libUniAccurate.so
+py/uniaccurate/libUniAccurate.*
+py/uniaccurate/UniAccurate.lib
 py/dist/
 py/build/
 py/*.egg-info/
 py/**/__pycache__/
 py/.pytest_cache/
+# vendored by setup.py (vendor_nim_source) right before `sdist` packages
+# files -- shipped inside the sdist tarball, never tracked here
+py/_nimsrc/
 
 # c test/example binaries
 tests/c/test_uniaccurate
