@@ -7,12 +7,31 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "uniaccurate"
 version = "1.0.0"
-description = "Python binding for the UniAccurate C library"
+description = "Error-free transforms and accurate summation/dot-product (Python binding over the UniAccurate C library)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
 authors = [{ name = "lbartoletti" }]
+keywords = ["floating-point", "summation", "numerical", "kahan", "compensated-summation"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: C",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/lituus-lab/UniAccurate"
+Repository = "https://github.com/lituus-lab/UniAccurate"
+Issues = "https://github.com/lituus-lab/UniAccurate/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=7"]

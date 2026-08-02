@@ -56,13 +56,16 @@ jobs:
           path: '*.tar.gz'
 
   wheels:
-    name: Wheel (${{ matrix.os }})
+    name: Wheel (${{ matrix.os }}, py${{ matrix.python-version }})
     needs: guard
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        # No Py_LIMITED_API/abi3 in setup.py: the extension is tied to each
+        # CPython minor version's C ABI, so every one needs its own wheel.
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: jiro4989/setup-nim-action@v2
@@ -71,7 +74,7 @@ jobs:
       - run: nimble install -y
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - run: pip install -U setuptools wheel Cython
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
@@ -88,11 +91,11 @@ jobs:
           esac
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-${{ matrix.os }}
+          name: wheel-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/*.whl
 
   publish:
-    name: Publish
+    name: Publish GitHub Release
     needs: [cabi, wheels]
     runs-on: ubuntu-latest
     steps:
@@ -104,3 +107,27 @@ jobs:
         with:
           files: artifacts/**/*
           generate_release_notes: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: wheels
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/uniaccurate/
+    permissions:
+      # Trusted publishing (OIDC): no API token stored here. Requires a
+      # one-time manual step on pypi.org -- add lituus-lab/UniAccurate,
+      # workflow release.yml, environment pypi as a trusted publisher for
+      # the uniaccurate project.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - run: ls dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
