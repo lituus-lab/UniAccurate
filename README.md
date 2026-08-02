@@ -2,9 +2,37 @@
 <!-- Copyright 2026 lituus-lab -->
 # UniAccurate
 
-Error-free transforms and accurate summation/dot-product for floating-point
 arithmetic: naive, pairwise, and compensated sums, and compensated dot
 products, in Nim, with a hand-written C ABI and a Cython Python binding.
+
+Correctly-rounded alternatives (Shewchuk's adaptive-precision expansion, the
+Neal small superaccumulator) are also available. Layer-1 in the `lituus-lab`
+`Uni*` family DAG: depends only on `nimsimd` (optional, `-d:simd`).
+
+## Quick start
+
+```nim
+import UniAccurate
+
+let (s, e) = twoSum(1.0, 2e16)          # (2e16, 1.0) -- error recovered exactly
+echo kahanSum(@[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])  # 1.0
+echo shewchukSum(@[1.0, 1e100, 1.0, -1e100])                        # 2.0, correctly rounded
+```
+
+```c
+#include "UniAccurate.h"
+double s, e;
+ua_two_sum(1.0, 2e16, &s, &e);          // s = 2e16, e = 1.0
+```
+
+```python
+import uniaccurate
+uniaccurate.two_sum(1.0, 2e16)          # (2e16, 1.0)
+```
+
+See `book/index.nim` (nimib, built into `book/index.html`) for the full walkthrough
+with error bounds and references, and `py/notebooks/quickstart.ipynb` for the
+Python side.
 
 ## Layout
 
@@ -19,8 +47,9 @@ tests/test_*.nim             Nim tests (eft, sums, compensated, shewchuk, exact,
 tests/c/                     C ABI test (links the header against the lib)
 examples/                    Nim + C demos
 py/                          Cython binding + pytest
+bench/                       cross-backend perf/accuracy comparator vs the C originals and Rust `accurate` (ADR-0007)
 ADRs/                        0001 optional deps, 0002 license, 0003 C ABI & Python, 0004 FMA, 0005 SIMD, 0006 new algos, 0007 perf levers
-.github/workflows/ci.yml     3-OS Nim matrix + C ABI + Python + SIMD
+.github/workflows/ci.yml     3-OS Nim matrix + C ABI + Python + SIMD + bench smoke
 ```
 
 ## Build
@@ -35,6 +64,7 @@ nimble ctest          # C ABI: static lib + tests/c
 nimble cexample       # C demo
 nimble example        # Nim demo
 nimble pyTest         # Cython + pytest
+nimble bench          # quick scalar bench smoke -> bench/compare/*.csv
 nimble coverage       # gcov + lcov -> coverage/
 nimble book           # nimib book -> book/index.html
 nimble docs           # book + API reference -> pages/
@@ -44,7 +74,11 @@ nimble docs           # book + API reference -> pages/
 
 `test`, `cabi` and `python` on ubuntu/macOS/Windows. `consume-cabi` and
 `consume-wheel` rebuild against the published artifacts on a machine without Nim,
-so what ships is what was tested. `coverage` and `docs` run on ubuntu.
+so what ships is what was tested. `bench` runs a reduced-size smoke on
+ubuntu/macOS — correctness/non-regression only, not the AVX-512 reference
+numbers from ADR-0007 (GitHub runners are not guaranteed AVX-512 hardware;
+that comparison stays a manual FreeBSD/Zen4 check). `coverage` and `docs` run
+on ubuntu.
 
 `dco` blocks PRs missing a `Signed-off-by` trailer; `commitizen` blocks PRs whose
 commits or title are not [Conventional Commits](https://www.conventionalcommits.org/)
