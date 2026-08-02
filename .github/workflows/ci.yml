@@ -305,3 +305,26 @@ jobs:
           path: |
             coverage/
             lcov.info
+
+  bench:
+    name: Bench smoke (${{ matrix.os }})
+    # Correctness/non-regression smoke on reduced sizes, not the AVX-512
+    # reference numbers from ADR-0008 -- GitHub runners are not guaranteed
+    # AVX-512 hardware, that comparison stays a manual FreeBSD/Zen4 check.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.10'
+      - run: nimble install -y
+      - run: nimble bench
+      - name: Upload Bench CSVs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.os }}
+          path: bench/compare/*.csv

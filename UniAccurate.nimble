@@ -115,6 +115,9 @@ task testAll, "debug + release + C ABI":
 task example, "Nim demo":
   exec "nim c -r --path:src -o:build/demo examples/demo.nim"
 
+task bench, "Quick scalar bench smoke (release, reduced sizes) -- not the AVX-512 reference numbers":
+  exec "nim c -r -d:release --path:src -o:build/bench_driver bench/driver_nim.nim quick ci"
+
 # Nim takes `-o:` literally and appends no platform extension.
 const
   sharedLib =
@@ -231,10 +234,19 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   let cache = "build/covcache"
   rmDir cache
   rmDir "coverage"
-  exec "nim c --path:src --nimcache:" & cache &
-       " --debugger:native --passC:--coverage --passL:--coverage" &
-       " -o:build/test_coverage tests/test_eft.nim"
-  exec "./build/test_coverage"
+  # Same cache dir across every test binary so gcov accumulates counters for
+  # modules shared between suites (twoSum, algorithms/*) instead of losing
+  # them to a fresh nimcache per compile.
+  const covTests = [
+    "test_eft", "test_naivesum", "test_pairwisesum", "test_compensatedsum",
+    "test_shewchuksum", "test_exactsum", "test_orosum", "test_dotproduct",
+    "test_expansions", "test_property"
+  ]
+  for t in covTests:
+    exec "nim c --path:src --nimcache:" & cache &
+         " --debugger:native --passC:--coverage --passL:--coverage" &
+         " -o:build/cov_" & t & " tests/" & t & ".nim"
+    exec "./build/cov_" & t
   exec "lcov --capture --directory " & cache & " --base-directory ." &
        " --include \"*/src/UniAccurate/*\" --output-file lcov.info --quiet"
   exec "genhtml lcov.info --output-directory coverage --legend --quiet"
