@@ -18,10 +18,33 @@
 ## A backend whose CSVs are absent is silently skipped (run only the columns you
 ## need; the matrix reports what was run). Run `nimble benchAll` after the bench
 ## tasks to produce the matrix.
-import std/[os, math, strutils, strformat, tables, algorithm, sequtils]
+import std/[os, math, strutils, strformat, tables, algorithm, sequtils, osproc]
 
 import UniAccurate
 import bench_data
+
+## `--readme` also splices a condensed f64 table for a handful of headline
+## algorithms into README.md, wrapped in a `<!-- bench:machine=<slug> -->`
+## block. Re-running with the same slug replaces only that block; a
+## different slug (`UNIACCURATE_BENCH_MACHINE` env var, for a box whose
+## auto-detected slug is not the one you want recorded, e.g. a FreeBSD/Zen4
+## box) appends alongside it -- one README can carry results from several
+## machines without one overwriting another's.
+const HeadlineAlgos = ["naive", "pairwise", "kahan", "dot2", "shewchuk"]
+
+proc machineSlug(): string =
+  if existsEnv("UNIACCURATE_BENCH_MACHINE"):
+    return getEnv("UNIACCURATE_BENCH_MACHINE")
+  var cpu = hostCPU
+  when defined(macosx):
+    let (brand, code) = execCmdEx("sysctl -n machdep.cpu.brand_string")
+    if code == 0: cpu = brand.strip()
+  elif defined(linux):
+    let (model, code) = execCmdEx("sh -c \"grep -m1 'model name' /proc/cpuinfo | cut -d: -f2\"")
+    if code == 0 and model.strip().len > 0: cpu = model.strip()
+  result = (hostOS & "-" & cpu).toLowerAscii().multiReplace(
+    (" ", "-"), ("(", ""), (")", ""), ("_", "-"))
+  while "--" in result: result = result.replace("--", "-")
 
 const OutDir = "bench/compare"
   # (backend label, file tag). The C/Rust drivers write fixed filenames; the
@@ -108,6 +131,33 @@ proc oracle(typ: string, dataset: string, n: int, isDot: bool): float64 =
 proc fmtErr(x: float64): string =
   if x == 0: "0" else: x.formatFloat(ffScientific, 4)
 
+proc spliceReadme(slug: string, body: string) =
+  ## Insert or replace the `<!-- bench:machine=slug -->` block in README.md.
+  ## First run for a slug anchors on the `<!-- bench:insert -->` marker inside
+  ## the Benchmarks section; a later run for the same slug replaces only the
+  ## content between its own start/end tags.
+  const path = "README.md"
+  if not fileExists(path):
+    stderr.writeLine("[readme] no README.md, skip splice")
+    return
+  let content = readFile(path)
+  let startTag = "<!-- bench:machine=" & slug & " -->"
+  let endTag = "<!-- /bench:machine=" & slug & " -->"
+  let full = startTag & "\n" & body & "\n" & endTag
+  if startTag in content:
+    let s = content.find(startTag)
+    let e = content.find(endTag) + endTag.len
+    writeFile(path, content[0 ..< s] & full & content[e .. ^1])
+    stderr.writeLine("[readme] replaced block for " & slug)
+  else:
+    const marker = "<!-- bench:insert -->"
+    if marker notin content:
+      stderr.writeLine("[readme] no <!-- bench:insert --> marker in README.md, skip splice")
+      return
+    let idx = content.find(marker) + marker.len
+    writeFile(path, content[0 ..< idx] & "\n\n" & full & content[idx .. ^1])
+    stderr.writeLine("[readme] inserted block for " & slug)
+
 proc main() =
   if not dirExists(OutDir):
     stderr.writeLine("no bench/compare/ -- run the bench tasks first")
@@ -189,7 +239,7 @@ proc main() =
     s.write("|---|---|" & backends.mapIt("---|").join() & "\n")
     for algo in algos:
       let n = bestN.getOrDefault((typ, algo))
-      var row = algo & " | " & $n & " |"
+      var row = "| " & algo & " | " & $n & " |"
       for be in backends:
         let v = cell.getOrDefault((typ, algo, n, be))
         row &= " " & (if v > 0: v.formatFloat(ffDecimal, 4) else: "-") & " |"
@@ -197,6 +247,23 @@ proc main() =
     s.writeLine("")
   stderr.writeLine("Wrote " & OutDir / "perf_matrix.csv" & ", " &
     OutDir / "acc_matrix.csv" & ", " & OutDir / "summary.md")
+
+  if paramCount() > 0 and paramStr(1) == "--readme":
+    let backends = Backends.mapIt(it[0])
+    var body = "ns/elem, f64, largest common n. Lower is faster. Full matrix" &
+      " (all algorithms, f32 included): `nimble benchAll` locally, see" &
+      " `bench/compare/summary.md` (generated, not tracked).\n\n"
+    body &= "| algo | n |" & backends.mapIt(" " & it & " |").join() & "\n"
+    body &= "|---|---|" & backends.mapIt("---|").join() & "\n"
+    for algo in HeadlineAlgos:
+      let n = bestN.getOrDefault(("f64", algo))
+      if n == 0: continue
+      var row = "| " & algo & " | " & $n & " |"
+      for be in backends:
+        let v = cell.getOrDefault(("f64", algo, n, be))
+        row &= " " & (if v > 0: v.formatFloat(ffDecimal, 4) else: "-") & " |"
+      body &= row & "\n"
+    spliceReadme(machineSlug(), body)
 
 when isMainModule:
   main()
