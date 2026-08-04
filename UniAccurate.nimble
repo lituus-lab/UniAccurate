@@ -301,5 +301,10 @@ task benchRustFma, "Rust accurate column (fma on, single-thread, needs cargo)":
 task benchAll, "Aggregate every backend column into perf/acc matrices + summary.md":
   exec "nim c -r --path:src bench/aggregate.nim"
 
-task benchReadme, "benchAll, plus splice a headline table into README.md for this machine":
+task benchPython, "Python binding vs math.fsum/sum() (needs the built Cython extension)":
+  exec "nimble buildCython"
+  exec "python3 py/bench_python.py"
+
+task benchReadme, "benchAll + benchPython, splice into README.md for this machine":
+  exec "nimble benchPython"
   exec "nim c -r --path:src bench/aggregate.nim --readme"

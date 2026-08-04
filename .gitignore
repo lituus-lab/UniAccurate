@@ -58,6 +58,7 @@ bench/originals/driver_originals
 bench/canonical/
 bench/compare/
 bench/rust/target/
+bench/.md_python.md
 
 # os / editor
 .DS_Store
