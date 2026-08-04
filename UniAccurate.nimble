@@ -251,3 +251,55 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
        " --include \"*/src/UniAccurate/*\" --output-file lcov.info --quiet"
   exec "genhtml lcov.info --output-directory coverage --legend --quiet"
   exec "lcov --summary lcov.info"
+
+# ---------------------------------------------------------------------------
+# Full cross-backend comparator (bench/, ADR-0007): one column per backend,
+# each writing bench/compare/{perf,cand}_<tag>.csv against the same canonical
+# datasets, then `nimble benchAll` joins them against one correctly-rounded
+# oracle. Heavier and slower than `nimble bench`'s smoke test -- run manually,
+# never in CI.
+# ---------------------------------------------------------------------------
+task benchData, "Export the canonical bench datasets + manifest":
+  exec "nim c -r --path:src bench/export_datasets.nim"
+
+task benchNim, "UniAccurate scalar column (release)":
+  exec "nim c -d:release --path:src -r bench/driver_nim.nim full nim"
+
+task benchNimFma, "UniAccurate scalar column with -d:useFMA (release)":
+  exec "nim c -d:release -d:useFMA --path:src -r bench/driver_nim.nim full nim_fma"
+
+task benchNimSimd, "UniAccurate SIMD column with -d:simd (host ISA)":
+  exec "nim c -d:release -d:simd" & simdArch &
+       " --path:src -r bench/driver_nim.nim full nim_simd"
+
+task benchC, "C originals column (FMA off)":
+  exec "cc -O3 -ffp-contract=off -o bench/originals/driver_originals" &
+       " bench/originals/driver_originals.c -lm"
+  exec "./bench/originals/driver_originals"
+  exec "mv -f bench/compare/perf_originals.csv bench/compare/perf_c.csv"
+  exec "mv -f bench/compare/cand_originals.csv bench/compare/cand_c.csv"
+
+task benchCFma, "C originals column with -mfma (FMA on)":
+  exec "cc -O3 -ffp-contract=off -mfma -o bench/originals/driver_originals" &
+       " bench/originals/driver_originals.c -lm"
+  exec "./bench/originals/driver_originals"
+  exec "mv -f bench/compare/perf_originals.csv bench/compare/perf_c_fma.csv"
+  exec "mv -f bench/compare/cand_originals.csv bench/compare/cand_c_fma.csv"
+
+task benchRust, "Rust accurate column (fma off, single-thread, needs cargo)":
+  exec "cd bench/rust && cargo build --release --no-default-features"
+  exec "./bench/rust/target/release/driver_rust"
+  exec "mv -f bench/compare/perf_rust_raw.csv bench/compare/perf_rust.csv"
+  exec "mv -f bench/compare/cand_rust_raw.csv bench/compare/cand_rust.csv"
+
+task benchRustFma, "Rust accurate column (fma on, single-thread, needs cargo)":
+  exec "cd bench/rust && cargo build --release"
+  exec "./bench/rust/target/release/driver_rust"
+  exec "mv -f bench/compare/perf_rust_raw.csv bench/compare/perf_rust_fma.csv"
+  exec "mv -f bench/compare/cand_rust_raw.csv bench/compare/cand_rust_fma.csv"
+
+task benchAll, "Aggregate every backend column into perf/acc matrices + summary.md":
+  exec "nim c -r --path:src bench/aggregate.nim"
+
+task benchReadme, "benchAll, plus splice a headline table into README.md for this machine":
+  exec "nim c -r --path:src bench/aggregate.nim --readme"
