@@ -11,11 +11,25 @@
 ## correct (diffs ~1e-12, expected for reordered summation), dispatches to
 ## AVX-512 via real CPUID, negligible dispatch overhead (~0.4% over a direct
 ## call). Measured: scalar 0.5864 ns/elem, AVX2 0.2042 (2.87x), AVX-512
-## 0.1869 (3.14x). This revision extends the same technique to `dot2`/`dotK3`
-## (K=3) -- untested past `nim check`-level review on arm64, which cannot
-## compile or type-check amd64 SIMD intrinsics at all. Re-run
-## `nimble simdRuntimeExperiment` on the AVX-512 machine and paste the output
-## (or the compiler error, if it fails to build).
+## 0.1869 (3.14x).
+##
+## `dot2`/`dotK3` initially measured a ~50x-per-FLOP gap vs `naiveDot` that
+## had nothing to do with SIMD: `twoProductFMA` calls the C99 libm `fma()`
+## (a real, un-inlinable external call, `twosum.nim`), which without
+## `-mfma` is NOT lowered to the hardware instruction -- exactly the
+## ADR-0007 Lever 1 cliff (dot2: 24.5 -> 1.70 ns/elem with `-d:useFMA`,
+## Zen4), independently reproduced here (~29-30 ns/elem, no `-d:useFMA`).
+## The `nimble simdRuntimeExperiment` task now passes `-d:useFMA` so the
+## scalar baselines get hardware FMA too -- the AVX2/AVX-512 kernels
+## already did, via their `target`-attributed intrinsics regardless of
+## that flag, which is what made the gap look SIMD-shaped when it wasn't.
+## Two real dead ends ruled out first, by adding controls rather than
+## re-guessing: the isFin guards (assumeFinite=true barely changed
+## anything) and dot2()'s own wrapper (a hand-written raw loop calling
+## twoProductFMA/twoSum directly matched dot2()'s timing almost exactly).
+##
+## Re-run `nimble simdRuntimeExperiment` on the AVX-512 machine once more
+## and paste the output (or the compiler error, if it fails to build).
 ##
 ## `dot2Avx2`/`dot2Avx512`/`dotK3Avx2`/`dotK3Avx512` mirror the exact EFT
 ## recurrence from `simd.nim`'s `defineDot2V`/`defineDotK3V` templates

@@ -202,7 +202,12 @@ task ctestSimd, "C ABI tests with -d:simd (host ISA)":
   exec makeExe & " -C tests/c"
 
 task simdRuntimeExperiment, "EXPERIMENTAL runtime AVX2/AVX-512 dispatch prototype (amd64 only, unverified off amd64)":
-  exec "nim c -r -d:release --path:src -o:build/simd_runtime_experiment" &
+  # -d:useFMA: without it, twoProductFMA's libm fma() call (a real,
+  # un-inlinable external call) isn't lowered to the hardware instruction --
+  # the scalar dot2/dotK3 baselines would otherwise measure the ADR-0007
+  # Lever 1 FMA cliff (24.5 -> 1.70 ns/elem on Zen4) instead of the SIMD
+  # kernels' own gain, which already use FMA intrinsics directly regardless.
+  exec "nim c -r -d:release -d:useFMA --path:src -o:build/simd_runtime_experiment" &
        " src/UniAccurate/simd_runtime_experiment.nim"
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
