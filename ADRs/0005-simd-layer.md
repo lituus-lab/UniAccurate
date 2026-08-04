@@ -66,6 +66,16 @@ in unconditionally by the umbrella) and nimsimd is still never imported by this
 path without either `-d:simd` or amd64 (`simd_dispatch.nim`'s own gate).
 Invariant 1 below covers the sum family and the ISA instantiation blocks only.
 
+**Amendment (ADR-0008, naive NaN recovery).** "`naive`/`pairwise` take the bare
+SIMD result" holds for the forward-error bound but not for NaN: the L lane sums
+accumulate independently, so on overflow-prone input one lane can reach `+Inf`
+and another `-Inf` and the merge yields NaN, which the left-to-right scalar body
+cannot reach (`Inf + finite = Inf`). `naiveSumSimd` therefore falls back to the
+scalar body when its result is NaN and every input was finite -- keeping it
+bit-identical to the no-`-d:simd` build, and matching the recovery `ua_dot_naive`
+already applied around the naive dot kernel. The compensated kernels need no such
+guard: a non-finite result is already `reliable = false`.
+
 **Amendment (ADR-0008, reliability tuple type).** The `(T, bool)` pair is the
 named type `SimdResult[T]`, not an anonymous tuple. A generic wrapper returning
 `(T, bool)` at `T = float64` and a concrete kernel returning `(float64, bool)`
