@@ -18,18 +18,21 @@
 ## (a real, un-inlinable external call, `twosum.nim`), which without
 ## `-mfma` is NOT lowered to the hardware instruction -- exactly the
 ## ADR-0007 Lever 1 cliff (dot2: 24.5 -> 1.70 ns/elem with `-d:useFMA`,
-## Zen4), independently reproduced here (~29-30 ns/elem, no `-d:useFMA`).
-## The `nimble simdRuntimeExperiment` task now passes `-d:useFMA` so the
-## scalar baselines get hardware FMA too -- the AVX2/AVX-512 kernels
-## already did, via their `target`-attributed intrinsics regardless of
-## that flag, which is what made the gap look SIMD-shaped when it wasn't.
-## Two real dead ends ruled out first, by adding controls rather than
-## re-guessing: the isFin guards (assumeFinite=true barely changed
-## anything) and dot2()'s own wrapper (a hand-written raw loop calling
-## twoProductFMA/twoSum directly matched dot2()'s timing almost exactly).
+## Zen4). Two dead ends were ruled out first by adding controls, not by
+## re-guessing (isFin guards: assumeFinite=true barely changed anything;
+## dot2()'s wrapper: a hand-written raw loop calling twoProductFMA/twoSum
+## directly matched dot2()'s own timing almost exactly) before the real
+## cause surfaced. Fixed by adding `-d:useFMA` to the task -- the AVX2/
+## AVX-512 kernels already had hardware FMA via their `target`-attributed
+## intrinsics regardless of that flag, which is what made the gap look
+## SIMD-shaped when it wasn't.
 ##
-## Re-run `nimble simdRuntimeExperiment` on the AVX-512 machine once more
-## and paste the output (or the compiler error, if it fails to build).
+## Final numbers, FreeBSD/Zen4, cross-validated against ADR-0007's own
+## independent measurement (dot2 scalar-default 1.7673 ns/elem here vs
+## its 1.70; guard-skip gain ~32% here vs its own reported ~32% for
+## assumeFinite): dot2 5.09x SIMD-only / 7.47x vs. real-world default;
+## dotK3 3.96x SIMD-only / 5.05x vs. real-world default. Modest and
+## honest, not the initial ~85-125x artifact.
 ##
 ## `dot2Avx2`/`dot2Avx512`/`dotK3Avx2`/`dotK3Avx512` mirror the exact EFT
 ## recurrence from `simd.nim`'s `defineDot2V`/`defineDotK3V` templates
