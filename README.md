@@ -175,14 +175,16 @@ Python 3.14.6 (CPython)
 
 Python 3.14.6 (CPython)
 
-| comparison | n | uniaccurate (ms) | reference (ms) | ratio (uniaccurate/reference) | same result? |
-|---|---|---|---|---|---|
-| shewchuk_sum vs math.fsum | 1000 | 0.066 | 0.007 | 9.89x | yes |
-| naive_sum vs sum() | 1000 | 0.060 | 0.002 | 34.36x | NO |
-| shewchuk_sum vs math.fsum | 100000 | 6.869 | 0.870 | 7.89x | yes |
-| naive_sum vs sum() | 100000 | 5.682 | 0.179 | 31.65x | NO |
-| shewchuk_sum vs math.fsum | 1000000 | 65.786 | 8.798 | 7.48x | yes |
-| naive_sum vs sum() | 1000000 | 57.392 | 1.968 | 29.17x | NO |
+The `list` path pays a per-call Python-side validation and copy cost (see "Where the time goes" below); the `array.array('d', ...)` fast path skips both. Honest result: `shewchuk_sum` on `array.array` reaches rough parity with `math.fsum` (~1.0x-1.2x here, not a clear win), and `naive_sum` on `array.array` genuinely beats `sum()` (~0.25x-0.4x) since `sum()` does more work per element (Neumaier compensation) than a plain loop.
+
+| comparison | n | uniaccurate, list (ms) | uniaccurate, array.array (ms) | reference (ms) | ratio list/ref | ratio array/ref | same result? |
+|---|---|---|---|---|---|---|---|
+| shewchuk_sum vs math.fsum | 1000 | 0.237 | 0.018 | 0.013 | 17.81x | 1.38x | yes |
+| naive_sum vs sum() | 1000 | 0.220 | 0.002 | 0.006 | 36.23x | 0.30x | NO |
+| shewchuk_sum vs math.fsum | 100000 | 6.849 | 0.913 | 0.861 | 7.95x | 1.06x | yes |
+| naive_sum vs sum() | 100000 | 5.719 | 0.053 | 0.181 | 31.52x | 0.29x | NO |
+| shewchuk_sum vs math.fsum | 1000000 | 65.887 | 8.912 | 8.877 | 7.42x | 1.00x | yes |
+| naive_sum vs sum() | 1000000 | 57.360 | 0.480 | 1.960 | 29.27x | 0.24x | NO |
 
 **Why `naive_sum` vs `sum()` says NO**: on this interpreter, `sum()` is not naive -- it already matches the correctly-rounded reference (`shewchuk_sum`) exactly, while `naive_sum` (a plain left-to-right loop) carries real rounding error:
 
@@ -192,13 +194,15 @@ Python 3.14.6 (CPython)
 | 100000 | 7.749e-07 | 0.000e+00 |
 | 1000000 | 1.568e-05 | 0.000e+00 |
 
-**Where the time goes** (`shewchuk_sum`, n=1000000): most of the gap above is the Python-side input-coercion loop, not the C summation itself:
+**Where the time goes** (`shewchuk_sum`, n=1000000):
 
 | stage | ms |
 |---|---|
-| full `shewchuk_sum` call | 66.189 |
-| `_validate()` only | 55.923 |
-| C core only (pre-validated) | 10.075 |
+| full call, list input | 65.503 |
+| full call, array.array input (fast path) | 8.803 |
+| `_validate()` only (list path) | 56.189 |
+| C core only, given a pre-validated list | 9.984 |
+| C core only, given the array.array directly (zero-copy) | 9.002 |
 
 <!-- /bench:machine=macosx-apple-m4 -->
 
