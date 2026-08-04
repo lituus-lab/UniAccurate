@@ -455,6 +455,14 @@ when defined(simd):
       (r, isFin(r) and maxLane <= float32(LaneConcentrationFallback) * abs(r))
 
   func naiveSumSimd*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+    ## SIMD naive sum. No reliability flag — the naive forward-error bound holds
+    ## regardless of lane concentration. Finite inputs never yield NaN: the L
+    ## lane sums accumulate independently, so one can overflow to `+Inf` and
+    ## another to `-Inf` and the scalar merge gives NaN, which the left-to-right
+    ## scalar `naiveSum` cannot reach (`Inf + finite = Inf`). On that rare
+    ## overflow the scalar body runs instead, so the result stays bit-identical
+    ## to the no-`-d:simd` build. Same order artifact, and same recovery, as
+    ## `naiveDotSimd` under `ua_dot_naive` (ADR-0008).
     ensure:
       x.len != 0 or result == T(0)
     body:
@@ -465,6 +473,8 @@ when defined(simd):
       elif T is float32 and defined(arm64):
         result = naiveSumSimdNeonF32(x)
       else:
+        result = naiveSum(x)
+      if classify(result) == fcNan and allFin(x):
         result = naiveSum(x)
 
   func pairwiseSimdRec[T: SomeFloat](x: openArray[T]; lo, hi: int): T =

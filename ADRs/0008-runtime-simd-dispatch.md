@@ -139,12 +139,27 @@ an 8-lane AVX-512 kernel, so no Nim-tier test could have caught this. The new
 cases run integer-exact agreement for every n in 0..40 and near-cancelling data
 at n = 8/16/64/500, on both sides of both vector widths (L = 4, L = 8).
 
-Pre-existing failures on this box, confirmed present at `b3ee77f` (before this
-ADR) and therefore out of its scope: `nimble simdAvx2`/`simdAvx512` fail
-"naive and compensated, signed big float64 up to n=10000" (NaN, SIMD *sum*
-family), `nimble ctestSimd` fails to compile (`-d:simd` C ABI, two structurally
-identical `(float64, bool)` tuples get distinct mangled C struct names), and
-`nimble lint` reports `simd.nim`/`simd_dispatch.nim` as nimpretty-dirty.
+The same round turned up three failures in the compile-time-locked `-d:simd`
+path, all confirmed present at `b3ee77f` (before this ADR) and all since fixed:
+
+- `nimble ctestSimd` never compiled on amd64: the generic wrapper's `(T, bool)`
+  at `T = float64` and `defineCompV`'s concrete `(float64, bool)` are one Nim
+  type but were emitted as two distinct C structs, and the backend rejected the
+  assignment. The pair is now a named type (`SimdResult[T]`), so one struct is
+  emitted.
+- `nimble simdAvx2`/`simdAvx512` failed "naive and compensated, signed big
+  float64 up to n=10000". Two causes under one test. `naiveSumSimd` was a real
+  bug: lanes accumulate independently, so one can reach `+Inf` and another
+  `-Inf` and the merge gives NaN, which left-to-right scalar `naiveSum` cannot
+  (`Inf + finite = Inf`) -- so `-d:simd` changed the answer on finite input,
+  with no reliability flag to catch it (NaN from n = 100 up, measured on
+  AVX-512). It now falls back to the scalar body on that overflow. The
+  compensated kernels were not a bug: they do return NaN there, but always with
+  `reliable = false`, and ADR-0005 places the guarantee on the composition --
+  the test was reading the raw value and discarding the flag, so the test was
+  corrected to check the composition as `c_api.nim` does.
+- `nimble lint` reported `simd.nim`/`simd_dispatch.nim` as nimpretty-dirty;
+  both are now clean.
 
 ## Consequences
 

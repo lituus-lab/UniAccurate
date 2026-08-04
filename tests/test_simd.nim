@@ -99,17 +99,24 @@ when defined(simd):
     suite "SIMD finite never NaN (overflow-prone float64)":
       var r = Seed xor 2
       test "naive and compensated, signed big float64 up to n=10000":
-        template checkFinite(simdP: untyped) =
-          let (res, _) = simdP(x)
-          check classify(res) != fcNan
+        # Lane sums accumulate independently, so on overflow-prone data one lane
+        # can reach +Inf and another -Inf and the merge gives NaN -- unreachable
+        # for the left-to-right scalar body. A compensated kernel reports that as
+        # `reliable = false` (its check is `isFin(r) and ...`) and the caller
+        # falls back to the scalar algorithm, so the no-NaN contract is on that
+        # composition, not on the raw kernel value -- ADR-0005, and exactly what
+        # `c_api.nim` does. `naiveSumSimd` has no flag, so it recovers itself.
+        template checkFinite(simdP, scalarP: untyped) =
+          let (res, rel) = simdP(x)
+          check classify(if rel: res else: scalarP(x)) != fcNan
         for n in [1, 10, 100, 1000, 10000]:
           var x = newSeq[float64](n)
           for i in 0 ..< n:
             x[i] = randomSignedBigF64(r)
           check classify(naiveSumSimd(x)) != fcNan
-          checkFinite(kahanSumSimd)
-          checkFinite(neumaierSumSimd)
-          checkFinite(kleinSumSimd)
+          checkFinite(kahanSumSimd, kahanSum)
+          checkFinite(neumaierSumSimd, neumaierSum)
+          checkFinite(kleinSumSimd, kleinSum)
 
     suite "SIMD dot == scalar bit-exact on integer data (float64)":
       var r = Seed xor 8
