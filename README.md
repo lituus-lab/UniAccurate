@@ -34,6 +34,50 @@ See `book/index.nim` (nimib, built into `book/index.html`) for the full walkthro
 with error bounds and references, and `py/notebooks/quickstart.ipynb` for the
 Python side.
 
+## What's inside
+
+- **Error-free transforms** (`twosum.nim`) — `twoSum`/`twoSumFast`, `twoProduct`
+  (and its FMA form): split a float sum/product into `(result, exactError)`
+  with no rounding lost, the building block everything below is composed from.
+- **Summation** (`algorithms/`) — naive, pairwise (tree-reduction), compensated
+  (Kahan, Neumaier, Klein), Shewchuk's adaptive-precision expansions, an exact
+  superaccumulator (Neal), and the ORO/Rump family (`sum2`/`sumK`,
+  `nearSum`/`accSum`).
+- **Dot products** (`algorithms/dotproduct.nim`) — naive, compensated
+  (`dot2`/`dotK3`), and a correctly-rounded `superDot`.
+- **SIMD kernels** (`simd.nim`) — AVX2/AVX-512 (amd64) and NEON (arm64)
+  vectorized sum/dot, see ADR-0005 and ADR-0007. The direct Nim API and the
+  sum family stay opt-in via `-d:simd`; the C ABI dot family (`ua_dot_naive`/
+  `ua_dot2`/`ua_dot_k`, including the Python wheels built on it) picks
+  AVX2/AVX-512 at runtime via CPUID unconditionally on amd64, no `-d:simd`
+  needed, see ADR-0008.
+
+## The Uni* family
+
+UniAccurate is layer 1 of `lituus-lab`'s `Uni*` family: a set of Nim libraries,
+each with a C ABI and a Python binding, unified by a shared dependency DAG and
+documentation/testing conventions. See
+[lituus-lab/.github](https://github.com/lituus-lab/.github) for the family's
+purpose and philosophy. UniAccurate itself depends on nothing else in the
+family (only the optional `nimsimd`); it exists to give downstream libraries —
+starting with UniMath's `BigFloat` rounding and UniLinalg's iterative
+refinement — an exact-accumulation primitive to build on.
+
+## Provenance & development
+
+The summation/dot algorithms here are textbook (Kahan, Neumaier, Klein,
+Shewchuk, Ogita-Rump-Oishi, Neal's superaccumulator) — no original numerics,
+gathered from the papers cited in `book/index.nim` and cross-checked against
+the C originals and the Rust `accurate` crate in `bench/`. The Nim
+implementation descends from an earlier hand-written `AccurateSums` (see
+`.github/README.md`).
+
+Development used LLM/agent assistance extensively, on the terms described
+below. One visible consequence: this repo's git history is short and linear,
+with commits landing close together in time — that reflects an LLM/agent
+rewrite pass over a pre-existing design, not the numerics being designed at
+that speed from a blank page.
+
 ## Layout
 
 ```
@@ -65,10 +109,73 @@ nimble cexample       # C demo
 nimble example        # Nim demo
 nimble pyTest         # Cython + pytest
 nimble bench          # quick scalar bench smoke -> bench/compare/*.csv
+nimble benchAll       # full cross-backend comparator -> bench/compare/summary.md (manual, see Benchmarks)
+nimble benchReadme    # benchAll, then splice a headline table into this README for this machine
 nimble coverage       # gcov + lcov -> coverage/
 nimble book           # nimib book -> book/index.html
 nimble docs           # book + API reference -> pages/
 ```
+
+## Benchmarks
+
+`nimble bench` is a reduced-size CI smoke test (correctness/non-regression
+only). For real numbers: run `benchData`, then one `bench<Backend>` task per
+column (`benchNim`, `benchNimFma`, `benchNimSimd`, `benchC`, `benchCFma`,
+`benchRust`/`benchRustFma` — the last two need `cargo`), then `benchAll` to
+time every algorithm against the C originals and the Rust `accurate` crate on
+the same canonical datasets and join all backends against one
+correctly-rounded oracle. Manual only, never in CI.
+
+`nimble benchReadme` runs the same aggregation and additionally writes a
+headline table below, tagged to the machine it ran on
+(`<!-- bench:machine=... -->` — see `bench/aggregate.nim`'s `spliceReadme`).
+Re-running on the same machine replaces only that machine's block; a second
+machine (say a FreeBSD/Zen4 box, `UNIACCURATE_BENCH_MACHINE` env var to name
+it explicitly) adds its own block alongside, so this table can carry more
+than one machine's numbers at once without either overwriting the other.
+
+<!-- bench:insert -->
+
+<!-- bench:machine=macosx-apple-m4 -->
+ns/elem, f64, largest common n. Lower is faster. Full matrix (all algorithms, f32 included): `nimble benchAll` locally, see `bench/compare/summary.md` (generated, not tracked).
+
+| algo | n | nim (ns/elem) | nim_fma (ns/elem) | nim_simd (ns/elem) | nim_fmadot (ns/elem) | c (ns/elem) | c_fma (ns/elem) | rust (ns/elem) | rust_fma (ns/elem) | nim/c |
+|---|---|---|---|---|---|---|---|---|---|---|
+| naive | 1000000 | 0.5326 | 0.5497 | 0.5387 | 0.5416 | 0.5378 | - | 0.5428 | 0.5396 | 0.99x |
+| pairwise | 1000000 | 0.2129 | 0.2222 | 0.2126 | 0.2116 | 0.3169 | - | - | - | 0.67x |
+| kahan | 1000000 | 2.2325 | 2.2226 | 2.2035 | 2.1970 | 2.1295 | - | 2.1524 | 2.1449 | 1.05x |
+| dot2 | 1000000 | 2.7865 | 2.9057 | 2.8034 | 2.7659 | 0.7327 | - | 1.5882 | 1.3764 | 3.80x |
+| shewchuk | 1000000 | 12.7226 | 13.4481 | 12.7184 | - | 12.2438 | - | - | - | 1.04x |
+
+**Python binding vs stdlib** (`nimble benchPython`)
+
+Python 3.14.6 (CPython)
+
+| comparison | n | uniaccurate, list (ms) | uniaccurate, array.array (ms) | reference (ms) | ratio list/ref | ratio array/ref | same result? |
+|---|---|---|---|---|---|---|---|
+| shewchuk_sum vs math.fsum | 1000 | 0.011 | 0.007 | 0.007 | 1.71x | 1.07x | yes |
+| naive_sum vs sum() | 1000 | 0.008 | 0.001 | 0.003 | 2.56x | 0.38x | NO |
+| shewchuk_sum vs math.fsum | 100000 | 1.334 | 0.947 | 0.865 | 1.54x | 1.09x | yes |
+| naive_sum vs sum() | 100000 | 0.467 | 0.055 | 0.183 | 2.55x | 0.30x | NO |
+| shewchuk_sum vs math.fsum | 1000000 | 12.780 | 8.879 | 8.780 | 1.46x | 1.01x | yes |
+| naive_sum vs sum() | 1000000 | 4.409 | 0.479 | 1.902 | 2.32x | 0.25x | NO |
+
+| n | \|naive_sum - correct\| | \|sum() - correct\| |
+|---|---|---|
+| 1000 | 9.313e-09 | 0.000e+00 |
+| 100000 | 7.749e-07 | 0.000e+00 |
+| 1000000 | 1.568e-05 | 0.000e+00 |
+
+| shewchuk_sum call, n=1000000 | ms |
+|---|---|
+| list input | 12.974 |
+| array.array input | 9.086 |
+
+<!-- /bench:machine=macosx-apple-m4 -->
+
+See ADR-0007 for the full lever-by-lever analysis (the `isFin` bit-mask, FMA
+enablement, `assumeFinite`, `useFastTwoSum`) and `bench/compare/summary.md`
+(generated locally, not tracked) for every algorithm and both `f32`/`f64`.
 
 ## CI
 
