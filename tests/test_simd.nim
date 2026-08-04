@@ -56,6 +56,11 @@ when defined(simd):
     bits = bits or (uint32(next(r)) and 0x007F_FFFF'u32)
     cast[float32](bits)
 
+  proc unit32(r: var uint64): float32 =
+    ## Uniform in [0, 1) -- bounded, unlike `randomF32`'s full exponent range,
+    ## so a chain of additions/products built from it cannot overflow.
+    float32(next(r) shr 40) * (1.0'f32 / 16777216.0'f32) # 2^24 mantissa bits
+
   proc randomIntF64(r: var uint64): float64 =
     let v = int64(next(r) mod 2_000_001) - 1_000_000
     float64(v)
@@ -211,6 +216,33 @@ when defined(simd):
           if rel3:
             let sc = dotK(x, y, 3)
             check abs(rd3 - sc) <= 1e-2'f32 * max(1.0'f32, abs(sc))
+
+      test "cancellation past the vector width stays within twice precision":
+        # `randomDotF32` above never targets cancellation, so it cannot catch a
+        # lane merge that rounds its own compensation away (the amd64 bug fixed
+        # in ADR-0008, defineDot2V/defineDotK3V -- but this NEON kernel is
+        # hand-written, not generated from the shared template, and had the
+        # same bug independently). Near-cancelling pairs make sum|xi*yi| >>
+        # |result|, so the lane running sums are far larger than the result --
+        # exactly where pre-collapsing costs ~eps*max|sl|, past the
+        # twice-precision bound, while lane concentration stays low enough
+        # that `reliable` still reads true.
+        const eps = 1.1920929e-7'f32
+        for n in [8, 16, 64, 500]:
+          var x, y: seq[float32]
+          for _ in 0 ..< n div 2:
+            let a = 1.0'f32 + unit32(r)
+            x.add a
+            x.add -a * (0.99'f32 + 0.02'f32 * unit32(r))
+            y.add 0.5'f32 + unit32(r)
+            y.add 0.5'f32 + unit32(r)
+          let want = dotK(x, y, 3) # scalar reference, exercises no SIMD kernel
+          let (rd2, rel2) = dot2Simd(x, y)
+          check rel2
+          check abs(rd2 - want) <= 4.0'f32 * eps * abs(want)
+          let (rd3, rel3) = dotK3Simd(x, y)
+          check rel3
+          check abs(rd3 - want) <= 4.0'f32 * eps * abs(want)
 
 else:
   echo "test_simd: skipped (build without -d:simd)"
