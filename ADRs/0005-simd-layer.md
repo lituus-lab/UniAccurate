@@ -13,8 +13,10 @@ A SIMD acceleration layer sits at vgraph index 2 (`twosum < algorithms < simd <
 c_api`). It is gated by `-d:simd`: a scalar build (no flag) never imports
 [nimsimd](https://github.com/lbartoletti/nimsimd), and `simd.nim` is an empty
 module without it. nimsimd is external infrastructure, pinned in `requires` to
-the `neon-avx512` fork branch (the way NimContracts is pinned), and is not
-subject to `checkVGraph`.
+the `lbartoletti/nimsimd` fork's `master` branch (the way NimContracts tracks
+`lbartoletti/NimContracts#main`) -- the AVX-512/NEON extras that once lived on
+a separate `neon-avx512` branch are on `master` now -- and is not subject to
+`checkVGraph`.
 
 The kernels keep `L` per-lane running sums in one vector accumulator, then
 scalar-reduce the lanes — `storev` to a stack array, no horizontal-add
