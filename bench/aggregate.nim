@@ -250,11 +250,14 @@ proc main() =
 
   if paramCount() > 0 and paramStr(1) == "--readme":
     let backends = Backends.mapIt(it[0])
-    var body = "ns/elem, f64, largest common n. Lower is faster. Full matrix" &
+    var body = "All times ns/elem (f64, largest common n) -- lower is faster." &
+      " `nim/c` is UniAccurate's default column against the honest external" &
+      " C reference (below 1.0 would mean UniAccurate is faster). Full matrix" &
       " (all algorithms, f32 included): `nimble benchAll` locally, see" &
       " `bench/compare/summary.md` (generated, not tracked).\n\n"
-    body &= "| algo | n |" & backends.mapIt(" " & it & " |").join() & "\n"
-    body &= "|---|---|" & backends.mapIt("---|").join() & "\n"
+    body &= "| algo | n |" & backends.mapIt(" " & it & " (ns/elem) |").join() &
+      " nim/c |\n"
+    body &= "|---|---|" & backends.mapIt("---|").join() & "---|\n"
     for algo in HeadlineAlgos:
       let n = bestN.getOrDefault(("f64", algo))
       if n == 0: continue
@@ -262,6 +265,9 @@ proc main() =
       for be in backends:
         let v = cell.getOrDefault(("f64", algo, n, be))
         row &= " " & (if v > 0: v.formatFloat(ffDecimal, 4) else: "-") & " |"
+      let nimV = cell.getOrDefault(("f64", algo, n, "nim"))
+      let cV = cell.getOrDefault(("f64", algo, n, "c"))
+      row &= " " & (if nimV > 0 and cV > 0: (nimV / cV).formatFloat(ffDecimal, 2) & "x" else: "-") & " |"
       body &= row & "\n"
     const pyFrag = "bench/.md_python.md"
     if fileExists(pyFrag):

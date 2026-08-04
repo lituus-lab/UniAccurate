@@ -137,7 +137,7 @@ than one machine's numbers at once without either overwriting the other.
 <!-- bench:insert -->
 
 <!-- bench:machine=macosx-apple-m4 -->
-ns/elem, f64, largest common n. Lower is faster. Full matrix (all algorithms, f32 included): `nimble benchAll` locally, see `bench/compare/summary.md` (generated, not tracked).
+All times ns/elem (f64, largest common n) -- lower is faster. `nim/c` is UniAccurate's default column against the honest external C reference (below 1.0 would mean UniAccurate is faster). Full matrix (all algorithms, f32 included): `nimble benchAll` locally, see `bench/compare/summary.md` (generated, not tracked).
 
 | algo | n | nim (ns/elem) | nim_fma (ns/elem) | nim_simd (ns/elem) | nim_fmadot (ns/elem) | c (ns/elem) | c_fma (ns/elem) | rust (ns/elem) | rust_fma (ns/elem) | nim/c |
 |---|---|---|---|---|---|---|---|---|---|---|
