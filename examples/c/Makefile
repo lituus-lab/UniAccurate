@@ -1,27 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-# Shell-free: `pwd` and `rm` are unavailable under mingw32-make on Windows.
-ifeq ($(origin CC),default)
-  ifeq ($(OS),Windows_NT)
-    CC := gcc
-  else
-    CC := cc
-  endif
-endif
-
+# POSIX-portable (`?=` only, no `ifeq`/`.if`): see tests/c/Makefile's header
+# for why -- GNU make, BSD make, and mingw32-make share no conditional
+# directive syntax. Windows overrides (CC, BIN, RUN, RM_F) come from
+# `UniAccurate.nimble`'s `make` invocation as command-line variable
+# assignments.
+CC     ?= cc
 ROOT   := $(CURDIR)/../..
 CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
 LIB    := $(ROOT)/libUniAccurate.a
-
-ifeq ($(OS),Windows_NT)
-  BIN  := demo.exe
-  RUN  := $(BIN)
-  RM_F := del /q
-else
-  BIN  := demo
-  RUN  := ./$(BIN)
-  RM_F := rm -f
-endif
+BIN    ?= demo
+RUN    ?= ./$(BIN)
+RM_F   ?= rm -f
 
 .PHONY: all run clean
 all: run
