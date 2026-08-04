@@ -84,7 +84,19 @@ when defined(amd64):
   # --------------------------------------------------------------------
 
   func dot2Scalar(x, y: openArray[float64]): float64 =
+    ## Default (assumeFinite=false): 4-5 isFin guards per element. This is
+    ## what a typical caller experiences today -- NOT a fair SIMD-only
+    ## comparison, since the AVX2/AVX-512 kernels below have no per-element
+    ## guards at all (matching the shipped dot2Simd's own no-guard
+    ## recurrence). See dot2ScalarUnguarded for the apples-to-apples one.
     dot2(x, y)
+
+  func dot2ScalarUnguarded(x, y: openArray[float64]): float64 =
+    ## assumeFinite=true: same unguarded EFT recurrence as the SIMD kernels
+    ## below, scalar. The fair baseline for isolating the SIMD-width gain
+    ## alone, separate from the (also real, already documented in
+    ## ADR-0007 Lever 3) gain from skipping the isFin guards.
+    dot2(x, y, assumeFinite = true)
 
   func dot2Avx2(x, y: openArray[float64]): float64
       {.codegenDecl: "__attribute__((target(\"avx2,fma\"))) $# $#$#".} =
@@ -169,7 +181,12 @@ when defined(amd64):
   # --------------------------------------------------------------------
 
   func dotK3Scalar(x, y: openArray[float64]): float64 =
+    ## Default (assumeFinite=false) -- see dot2Scalar's comment, same caveat.
     dotK(x, y, 3)
+
+  func dotK3ScalarUnguarded(x, y: openArray[float64]): float64 =
+    ## assumeFinite=true -- see dot2ScalarUnguarded's comment, same reasoning.
+    dotK(x, y, 3, assumeFinite = true)
 
   func dotK3Avx2(x, y: openArray[float64]): float64
       {.codegenDecl: "__attribute__((target(\"avx2,fma\"))) $# $#$#".} =
@@ -348,35 +365,59 @@ when defined(amd64):
       # Zen4, not physically possible for a real O(n) computation).
       sinkAcc += v
 
-    proc checkAndTime(name: string, scalarFn, avx2Fn, avx512Fn, runtimeFn: DotKernel) =
+    proc timeit(fn: DotKernel, reps: int): float =
+      result = 1e18
+      for _ in 1 .. reps:
+        let t0 = getMonoTime()
+        keep(fn(x, y))
+        let dt = (getMonoTime() - t0).inNanoseconds.float
+        if dt < result: result = dt
+      result /= n.float
+
+    proc checkAndTime(name: string, scalarFn, avx2Fn, avx512Fn, runtimeFn: DotKernel,
+                       unguardedFn: DotKernel = nil) =
       let rScalar = scalarFn(x, y)
       let rAvx2 = avx2Fn(x, y)
       let rAvx512 = avx512Fn(x, y)
       echo name, ":"
-      echo &"  scalar = {rScalar:.6f}"
-      echo &"  avx2   = {rAvx2:.6f}  (|diff| = {abs(rAvx2 - rScalar):.3e})"
-      echo &"  avx512 = {rAvx512:.6f}  (|diff| = {abs(rAvx512 - rScalar):.3e})"
+      echo &"  scalar (default) = {rScalar:.6f}"
+      echo &"  avx2             = {rAvx2:.6f}  (|diff| = {abs(rAvx2 - rScalar):.3e})"
+      echo &"  avx512           = {rAvx512:.6f}  (|diff| = {abs(rAvx512 - rScalar):.3e})"
 
-      proc timeit(fn: DotKernel, reps: int): float =
-        result = 1e18
-        for _ in 1 .. reps:
-          let t0 = getMonoTime()
-          keep(fn(x, y))
-          let dt = (getMonoTime() - t0).inNanoseconds.float
-          if dt < result: result = dt
-        result /= n.float
-
-      echo &"  timing (best of 20, ns/elem): scalar {timeit(scalarFn, 20):.4f}" &
-        &" | avx2 {timeit(avx2Fn, 20):.4f} | avx512 {timeit(avx512Fn, 20):.4f}" &
-        &" | dispatch({isaName}) {timeit(runtimeFn, 20):.4f}"
+      if unguardedFn != nil:
+        # Two different comparisons: default-guarded scalar (what a caller
+        # gets today) vs SIMD conflates the SIMD-width gain with the
+        # separate, already-documented (ADR-0007 Lever 3) gain from
+        # skipping dot2/dotK's per-element isFin guards -- the SIMD kernels
+        # have no such guards, matching the shipped dot2Simd/dotK3Simd.
+        # unguardedFn (assumeFinite=true) isolates the SIMD-only effect.
+        let tScalar = timeit(scalarFn, 20)
+        let tUnguarded = timeit(unguardedFn, 20)
+        let tAvx2 = timeit(avx2Fn, 20)
+        let tAvx512 = timeit(avx512Fn, 20)
+        let tDispatch = timeit(runtimeFn, 20)
+        echo "  timing (best of 20, ns/elem):"
+        echo &"    scalar, default (assumeFinite=false, guarded) : {tScalar:.4f}"
+        echo &"    scalar, unguarded (assumeFinite=true)         : {tUnguarded:.4f}"
+        echo &"    avx2                                          : {tAvx2:.4f}"
+        echo &"    avx512                                        : {tAvx512:.4f}"
+        echo &"    dispatch (picked {isaName})                    : {tDispatch:.4f}"
+        echo &"    SIMD-only gain (unguarded scalar / avx512): {(tUnguarded / tAvx512):.2f}x"
+        echo &"    guard-skip + SIMD gain (default scalar / avx512): {(tScalar / tAvx512):.2f}x"
+      else:
+        echo &"  timing (best of 20, ns/elem): scalar {timeit(scalarFn, 20):.4f}" &
+          &" | avx2 {timeit(avx2Fn, 20):.4f} | avx512 {timeit(avx512Fn, 20):.4f}" &
+          &" | dispatch({isaName}) {timeit(runtimeFn, 20):.4f}"
       echo ""
 
     checkAndTime("naiveDot", naiveDotScalar, naiveDotAvx2, naiveDotAvx512,
       proc(x, y: openArray[float64]): float64 = naiveDotRuntime(x, y))
     checkAndTime("dot2", dot2Scalar, dot2Avx2, dot2Avx512,
-      proc(x, y: openArray[float64]): float64 = dot2Runtime(x, y))
+      proc(x, y: openArray[float64]): float64 = dot2Runtime(x, y),
+      dot2ScalarUnguarded)
     checkAndTime("dotK3", dotK3Scalar, dotK3Avx2, dotK3Avx512,
-      proc(x, y: openArray[float64]): float64 = dotK3Runtime(x, y))
+      proc(x, y: openArray[float64]): float64 = dotK3Runtime(x, y),
+      dotK3ScalarUnguarded)
 
     echo "sink = ", sinkAcc # keeps every timed call live across the whole run
 
