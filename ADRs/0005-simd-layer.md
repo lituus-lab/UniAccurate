@@ -66,6 +66,14 @@ in unconditionally by the umbrella) and nimsimd is still never imported by this
 path without either `-d:simd` or amd64 (`simd_dispatch.nim`'s own gate).
 Invariant 1 below covers the sum family and the ISA instantiation blocks only.
 
+**Amendment (ADR-0008, lane merge).** The dot kernels' scalar merge takes the
+`L` lane sums and their `L` (resp. `2L`) compensation terms as separate
+addends. Collapsing each lane first (`sl[j] + el[j]`, then merging the `L`
+results) rounds the compensation away at ~`eps * max|sl|`, which exceeds the
+twice/threefold bound on cancellation data while lane concentration stays
+under `LaneConcentrationFallback` -- so the reliability check below does not
+catch it. See ADR-0008's Verification for the measured case.
+
 ## Invariants
 
 1. `-d:simd` is the master gate for the sum family (`naiveSumSimd`/

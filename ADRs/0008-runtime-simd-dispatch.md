@@ -2,8 +2,8 @@
 <!-- Copyright 2026 lituus-lab -->
 # ADR-0008: Runtime AVX2/AVX-512 dispatch for the C ABI dot family
 
-- Status: Accepted (naiveDot path hardware-validated; dot2/dotK3 reliability
-  shape not yet hardware-validated -- see Verification below)
+- Status: Accepted (hardware-validated on amd64/Zen4, dot2/dotK3 reliability
+  tuple included -- see Verification below)
 - Date: 2026-08-04
 - Scope: `src/UniAccurate/simd.nim` (templates hoisted above the `-d:simd`
   gate), `src/UniAccurate/simd_dispatch.nim` (new), `src/UniAccurate/c_api.nim`
@@ -95,27 +95,56 @@ overhead. Measured: scalar 0.5864 ns/elem, AVX2 0.2042 (2.87x), AVX-512 0.1869
 3.96x/5.05x (SIMD-only / vs. real-world default), cross-validated three ways
 against ADR-0007's own independent FMA-lever measurement.
 
-**Not yet hardware-validated**: applying `codegenDecl`'s `target` attribute to
-a `(float64, bool)`-returning func (the reliability-tuple shape this ADR
-actually ships for `dispatchDot2`/`dispatchDotK3`) is a new combination beyond
-what ran on the FreeBSD/Zen4 box -- only the scalar-returning shape was tested
-there. What has been verified without amd64 hardware:
+**The reliability-tuple round (2026-08-04)**, on FreeBSD 16.0-CURRENT amd64,
+AMD Ryzen 9 7900X (Zen4, `avx2 avx512f avx512dq avx512vl fma`), Nim 2.3.1 /
+clang. Applying `codegenDecl`'s `target` attribute to a `(float64, bool)`-
+returning func -- the shape this ADR ships for `dispatchDot2`/`dispatchDotK3`,
+and the one the earlier round did not cover -- was exercised for real:
 
-- `nim check --cpu:amd64 --os:linux` (full semantic check, no codegen) passes
-  for `simd.nim`, `simd_dispatch.nim`, and `c_api.nim`, in every relevant
-  build config (`-d:release` alone; `-d:release -d:simd -d:avx2`; `-d:release
-  -d:simd -d:avx512`).
-- On this arm64 development machine: `simd_dispatch.nim`'s `else:` (non-amd64)
-  branch, which shares the same public API and fallback logic as the amd64
-  branch, compiles and runs correctly, and the full `nimble testAll` +
-  `nimble ctest` + `nimble pyTest` suites (899 Python tests, the C ABI dot/
-  dot2/dotK cancellation and overflow edge cases) pass unchanged end to end.
-  This proves the fallback path and the surrounding `c_api.nim` wiring, not
-  the AVX2/AVX-512 codegen itself.
+- **Codegen.** `objdump -d libUniAccurate.a` on the default `nimble clibStatic`
+  build (no `-d:simd`, no `-m` flag): `dispatchDot2Avx512` 46 `zmm` operands,
+  `dispatchDotK3Avx512` 71, `dispatchNaiveDotAvx512` 4; the AVX2 variants
+  `ymm`-only (41 / 66 / 3) with zero `zmm`. Both ISA variants of the
+  tuple-returning kernels coexist in one translation unit, per-function
+  `target` attribute only, as designed.
+- **Selection.** `checkInstructionSets({AVX512F})` returns true on this box, so
+  the AVX-512 kernels (L = 8) are the ones actually running.
+- **Correctness.** `nimble testAll` 598 checks / 0 failures (Nim debug +
+  release + the C ABI suite), `nimble testSimd` 284, `nimble ctest` green, and
+  the exact-rational Python oracle 899/899 through the C ABI.
 
-A fresh FreeBSD/Zen4 run exercising `ua_dot2`/`ua_dot_k(k=2)`/`ua_dot_k(k=3)`
-through the real C ABI (not the old scalar-returning prototype shape) is the
-remaining step before this ADR's Status can drop the caveat.
+**A real bug surfaced in this round, in the lane merge, and is fixed here.**
+`defineDot2V`/`defineDotK3V` collapsed each lane to `sl[j] + el[j]` (resp.
+`sl[j] + esl[j] + ecl[j]`) *before* the `neumaierSum` merge, rounding away the
+compensation the kernel had just computed. The cost is ~`eps * max|sl|`, which
+is invisible on well-conditioned data but not under cancellation, where
+`max|sl| >> |result|`. The exact-rational oracle caught it as 9 forward-error-
+bound violations (`dot_cancel_{10,100,500}` x `dot2`/`dot_k` K = 2, 3), all on
+the amd64 SIMD path only. On `dot_cancel_500` (n = 500, E = 7.425e+02,
+cond = E/|S| = 4.6e+02): dispatched `dot2` err `1.443290e-14` against a
+`3.570200e-16` bound (~40x over), while the scalar `dot2`/`dotK3` were exact
+(err = 0) on the same input. The lane-concentration guard did not fire --
+`maxLane/|r| = 61.06`, well under `LaneConcentrationFallback = 1024` -- so the
+result was returned as `reliable`, which is exactly why a threshold heuristic
+could not substitute for merging correctly.
+
+The fix merges the `2L` (dot2) / `3L` (dotK3) lane parts as separate addends
+instead of pre-collapsing them, restoring err = 0 on that case and clearing all
+9 oracle failures. It is a correction to the ADR-0005 kernels themselves, so it
+applies to the `-d:simd` path too, not just this ADR's runtime dispatch.
+
+`tests/test_simd_dispatch.nim` gained a "past the vector width" suite: the
+pre-existing cases topped out at n = 4, which never reaches the strided loop of
+an 8-lane AVX-512 kernel, so no Nim-tier test could have caught this. The new
+cases run integer-exact agreement for every n in 0..40 and near-cancelling data
+at n = 8/16/64/500, on both sides of both vector widths (L = 4, L = 8).
+
+Pre-existing failures on this box, confirmed present at `b3ee77f` (before this
+ADR) and therefore out of its scope: `nimble simdAvx2`/`simdAvx512` fail
+"naive and compensated, signed big float64 up to n=10000" (NaN, SIMD *sum*
+family), `nimble ctestSimd` fails to compile (`-d:simd` C ABI, two structurally
+identical `(float64, bool)` tuples get distinct mangled C struct names), and
+`nimble lint` reports `simd.nim`/`simd_dispatch.nim` as nimpretty-dirty.
 
 ## Consequences
 
