@@ -45,6 +45,16 @@ const LaneConcentrationFallback* = 1024.0
   ## runtime-CPUID-dispatched dot kernels `c_api.nim` calls directly -- no
   ## `-d:simd` needed for that path.
 
+type SimdResult*[T] = tuple[value: T; reliable: bool]
+  ## The `(result, reliable)` pair the compensated kernels return. Named, not
+  ## anonymous: a generic wrapper returning `(T, bool)` and a concrete kernel
+  ## returning `(float64, bool)` are the same Nim type but were emitted as two
+  ## distinct C structs, so the C ABI build (`-d:simd`) failed to compile on
+  ## the assignment between them (ADR-0008). Hoisted above the `-d:simd` gate
+  ## alongside `defineDot2V`/`defineDotK3V`, which return it, for the same
+  ## reason those templates are hoisted: `simd_dispatch.nim` instantiates them
+  ## unconditionally on amd64.
+
 template defineNaiveDotV*(name, zero, loadv, fmaddv, storev, L: untyped;
                           targetAttr: static string = "$# $#$#") =
   ## K-lane strided FMA dot reduce; scalar naive merge of the K lane dots and
@@ -80,8 +90,8 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
   ## scalar IEEE result) or when a lane running sum concentrates beyond
   ## `LaneConcentrationFallback * |result|` (cancellation data) -- then the
   ## caller falls back to the scalar `dot2` body for a scalar-exact result.
-  func name(x, y: openArray[float64]): (float64,
-      bool) {.codegenDecl: targetAttr.} =
+  func name(x, y: openArray[float64]): SimdResult[
+      float64] {.codegenDecl: targetAttr.} =
     if x.len == 0: return (0.0, true)
     var s = zero
     var e = zero
@@ -141,8 +151,8 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
   ## lane parts `sk`, `esk`, `eck` are merged scalarly with `neumaierSum` as
   ## separate addends (its merge error is far below the K = 3 bound, so a
   ## 2-fold merge suffices). Same reliability contract as `dot2`.
-  func name(x, y: openArray[float64]): (float64,
-      bool) {.codegenDecl: targetAttr.} =
+  func name(x, y: openArray[float64]): SimdResult[
+      float64] {.codegenDecl: targetAttr.} =
     if x.len == 0: return (0.0, true)
     var s = zero
     var es = zero
@@ -235,7 +245,7 @@ when defined(simd):
 
   template defineCompV(name, zero, loadv, addv, storev, L: untyped;
                       merge: proc(v: openArray[float64]): float64) =
-    func name(x: openArray[float64]): (float64, bool) =
+    func name(x: openArray[float64]): SimdResult[float64] =
       if x.len == 0: return (0.0, true)
       var acc = zero
       var i = 0
@@ -336,7 +346,7 @@ when defined(simd):
       for j in 0 ..< L: result += lanes[j]
       while i < n: result += x[i] * y[i]; inc i
 
-    func dot2SimdNeonF32(x, y: openArray[float32]): (float32, bool) =
+    func dot2SimdNeonF32(x, y: openArray[float32]): SimdResult[float32] =
       if x.len == 0: return (0.0'f32, true)
       const L = 4
       var s = vmovq_n_f32(0.0'f32)
@@ -381,7 +391,7 @@ when defined(simd):
       for v in sl: maxLane = max(maxLane, abs(v))
       (r, isFin(r) and maxLane <= float32(LaneConcentrationFallback) * abs(r))
 
-    func dotK3SimdNeonF32(x, y: openArray[float32]): (float32, bool) =
+    func dotK3SimdNeonF32(x, y: openArray[float32]): SimdResult[float32] =
       if x.len == 0: return (0.0'f32, true)
       const L = 4
       var s = vmovq_n_f32(0.0'f32)
@@ -475,7 +485,8 @@ when defined(simd):
       else:
         result = pairwiseSum(x)
 
-  func kahanSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) {.contractual.} =
+  func kahanSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
+      T] {.contractual.} =
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:
@@ -486,8 +497,8 @@ when defined(simd):
       else:
         result = (kahanSum(x), true)
 
-  func neumaierSumSimd*[T: SomeFloat](x: openArray[T]): (T,
-      bool) {.contractual.} =
+  func neumaierSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
+      T] {.contractual.} =
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:
@@ -498,7 +509,8 @@ when defined(simd):
       else:
         result = (neumaierSum(x), true)
 
-  func kleinSumSimd*[T: SomeFloat](x: openArray[T]): (T, bool) {.contractual.} =
+  func kleinSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
+      T] {.contractual.} =
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:
@@ -527,7 +539,8 @@ when defined(simd):
       else:
         result = naiveDot(x, y)
 
-  func dot2Simd*[T: SomeFloat](x, y: openArray[T]): (T, bool) {.contractual.} =
+  func dot2Simd*[T: SomeFloat](x, y: openArray[T]): SimdResult[
+      T] {.contractual.} =
     ## SIMD Dot2 (K = 2) kernel — `(result, reliable)`. The C ABI dispatches to
     ## this on a SIMD ISA and falls back to the scalar `dot2` when `reliable` is
     ## false (lane concentration or a non-finite result); off the SIMD ISAs it
@@ -546,7 +559,8 @@ when defined(simd):
       else:
         result = (dot2(x, y), true)
 
-  func dotK3Simd*[T: SomeFloat](x, y: openArray[T]): (T, bool) {.contractual.} =
+  func dotK3Simd*[T: SomeFloat](x, y: openArray[T]): SimdResult[
+      T] {.contractual.} =
     ## SIMD DotK (K = 3) kernel — `(result, reliable)`. See `dot2Simd`; the
     ## scalar fallback is `dotK(x, y, 3)`.
     require:

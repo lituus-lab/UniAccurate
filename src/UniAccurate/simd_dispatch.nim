@@ -81,7 +81,7 @@ when defined(amd64) and not defined(vcc):
 
   type
     NaiveDotFn = proc(x, y: openArray[float64]): float64 {.nimcall, raises: [].}
-    DotKFn = proc(x, y: openArray[float64]): (float64, bool) {.nimcall,
+    DotKFn = proc(x, y: openArray[float64]): SimdResult[float64] {.nimcall,
         raises: [].}
 
   var naiveDotImpl: NaiveDotFn
@@ -90,10 +90,10 @@ when defined(amd64) and not defined(vcc):
   proc scalarNaiveDot(x, y: openArray[float64]): float64 {.raises: [].} =
     naiveDot(x, y)
 
-  proc scalarDot2(x, y: openArray[float64]): (float64, bool) {.raises: [].} =
+  proc scalarDot2(x, y: openArray[float64]): SimdResult[float64] {.raises: [].} =
     (dot2(x, y), true)
 
-  proc scalarDotK3(x, y: openArray[float64]): (float64, bool) {.raises: [].} =
+  proc scalarDotK3(x, y: openArray[float64]): SimdResult[float64] {.raises: [].} =
     (dotK(x, y, 3), true)
 
   proc initDispatch() {.raises: [].} =

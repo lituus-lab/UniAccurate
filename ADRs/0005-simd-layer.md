@@ -66,6 +66,13 @@ in unconditionally by the umbrella) and nimsimd is still never imported by this
 path without either `-d:simd` or amd64 (`simd_dispatch.nim`'s own gate).
 Invariant 1 below covers the sum family and the ISA instantiation blocks only.
 
+**Amendment (ADR-0008, reliability tuple type).** The `(T, bool)` pair is the
+named type `SimdResult[T]`, not an anonymous tuple. A generic wrapper returning
+`(T, bool)` at `T = float64` and a concrete kernel returning `(float64, bool)`
+are the same Nim type, but the C backend emitted two distinct structs and
+rejected the assignment, which kept the `-d:simd` C ABI build from compiling at
+all on amd64.
+
 **Amendment (ADR-0008, lane merge).** The dot kernels' scalar merge takes the
 `L` lane sums and their `L` (resp. `2L`) compensation terms as separate
 addends. Collapsing each lane first (`sl[j] + el[j]`, then merging the `L`
