@@ -38,6 +38,7 @@ when defined(amd64):
   import nimsimd/runtimecheck
   import ./algorithms/dotproduct
   import ./algorithms/compensatedsum
+  import ./twosum
 
   # --------------------------------------------------------------------
   # naiveDot -- validated on real AVX-512 hardware (see header).
@@ -97,6 +98,24 @@ when defined(amd64):
     ## alone, separate from the (also real, already documented in
     ## ADR-0007 Lever 3) gain from skipping the isFin guards.
     dot2(x, y, assumeFinite = true)
+
+  func dot2ScalarRawLoop(x, y: openArray[float64]): float64 =
+    ## Diagnostic: dot2's own EFT recurrence, calling the library's
+    ## already-{.inline.} twoProductFMA/twoSum directly, with no
+    ## {.contractual.} require/ensure wrapper and no `when not
+    ## assumeFinite:` guards physically present in the source (not just
+    ## compiled away) -- isolates whether twoProductFMA/twoSum themselves
+    ## are the ~50x-per-FLOP-vs-naiveDot gap, or something specific to
+    ## dot2()'s own generated wrapper.
+    if x.len == 0: return 0.0
+    var (s, r1) = twoProductFMA(x[0], y[0])
+    var e = r1
+    for i in 1 ..< x.len:
+      let (h, r1i) = twoProductFMA(x[i], y[i])
+      let (s2, r2) = twoSum(s, h)
+      s = s2
+      e = (e + r1i) + r2
+    s + e
 
   func dot2Avx2(x, y: openArray[float64]): float64
       {.codegenDecl: "__attribute__((target(\"avx2,fma\"))) $# $#$#".} =
@@ -375,7 +394,7 @@ when defined(amd64):
       result /= n.float
 
     proc checkAndTime(name: string, scalarFn, avx2Fn, avx512Fn, runtimeFn: DotKernel,
-                       unguardedFn: DotKernel = nil) =
+                       unguardedFn: DotKernel = nil, rawLoopFn: DotKernel = nil) =
       let rScalar = scalarFn(x, y)
       let rAvx2 = avx2Fn(x, y)
       let rAvx512 = avx512Fn(x, y)
@@ -399,6 +418,12 @@ when defined(amd64):
         echo "  timing (best of 20, ns/elem):"
         echo &"    scalar, default (assumeFinite=false, guarded) : {tScalar:.4f}"
         echo &"    scalar, unguarded (assumeFinite=true)         : {tUnguarded:.4f}"
+        if rawLoopFn != nil:
+          # Diagnostic: unguarded ~= default above means the guards were
+          # never the story -- this isolates whether twoProductFMA/twoSum
+          # (both already {.inline.}) or dot2()'s own wrapper explains the
+          # remaining gap to naiveDot's per-FLOP cost.
+          echo &"    scalar, raw loop (bypasses dot2() entirely)   : {timeit(rawLoopFn, 20):.4f}"
         echo &"    avx2                                          : {tAvx2:.4f}"
         echo &"    avx512                                        : {tAvx512:.4f}"
         echo &"    dispatch (picked {isaName})                    : {tDispatch:.4f}"
@@ -414,7 +439,7 @@ when defined(amd64):
       proc(x, y: openArray[float64]): float64 = naiveDotRuntime(x, y))
     checkAndTime("dot2", dot2Scalar, dot2Avx2, dot2Avx512,
       proc(x, y: openArray[float64]): float64 = dot2Runtime(x, y),
-      dot2ScalarUnguarded)
+      dot2ScalarUnguarded, dot2ScalarRawLoop)
     checkAndTime("dotK3", dotK3Scalar, dotK3Avx2, dotK3Avx512,
       proc(x, y: openArray[float64]): float64 = dotK3Runtime(x, y),
       dotK3ScalarUnguarded)
