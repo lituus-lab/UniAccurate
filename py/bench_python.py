@@ -32,8 +32,6 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 import uniaccurate  # noqa: E402
-from uniaccurate import _validate  # noqa: E402
-from uniaccurate._core import _sum_shewchuk_c, _sum_shewchuk_buf_c  # noqa: E402
 
 
 def timeit(fn, data, repeats=7):
@@ -72,17 +70,14 @@ def main():
         builtin = sum(data)
         accuracy_rows.append((n, abs(naive - truth), abs(builtin - truth)))
 
+    biggest = [random.uniform(-1e6, 1e6) for _ in range(sizes[-1])]
+    biggest_buf = array.array("d", biggest)
+    t_full_list = timeit(uniaccurate.shewchuk_sum, biggest)
+    t_full_buf = timeit(uniaccurate.shewchuk_sum, biggest_buf)
+
     out_path = os.path.join(os.path.dirname(__file__), "..", "bench", ".md_python.md")
     with open(out_path, "w") as f:
         f.write(f"Python {platform.python_version()} ({platform.python_implementation()})\n\n")
-        f.write("The `list` path pays a per-call Python-side validation and "
-                 "copy cost (see \"Where the time goes\" below); the "
-                 "`array.array('d', ...)` fast path skips both. Honest "
-                 "result: `shewchuk_sum` on `array.array` reaches rough "
-                 "parity with `math.fsum` (~1.0x-1.2x here, not a clear win), "
-                 "and `naive_sum` on `array.array` genuinely beats `sum()` "
-                 "(~0.25x-0.4x) since `sum()` does more work per element "
-                 "(Neumaier compensation) than a plain loop.\n\n")
         f.write("| comparison | n | uniaccurate, list (ms) | uniaccurate, "
                  "array.array (ms) | reference (ms) | ratio list/ref | "
                  "ratio array/ref | same result? |\n")
@@ -93,35 +88,15 @@ def main():
             f.write(f"| {na} vs {nb} | {n} | {ta_list * 1000:.3f} | "
                      f"{ta_buf * 1000:.3f} | {tb * 1000:.3f} | {r_list:.2f}x | "
                      f"{r_buf:.2f}x | {'yes' if eq else 'NO'} |\n")
-        f.write("\n**Why `naive_sum` vs `sum()` says NO**: on this interpreter, "
-                 "`sum()` is not naive -- it already matches the correctly-rounded "
-                 "reference (`shewchuk_sum`) exactly, while `naive_sum` (a plain "
-                 "left-to-right loop) carries real rounding error:\n\n")
-        f.write("| n | \\|naive_sum - correct\\| | \\|sum() - correct\\| |\n")
+
+        f.write("\n| n | \\|naive_sum - correct\\| | \\|sum() - correct\\| |\n")
         f.write("|---|---|---|\n")
         for n, naive_err, builtin_err in accuracy_rows:
             f.write(f"| {n} | {naive_err:.3e} | {builtin_err:.3e} |\n")
 
-        # Where the time goes, at the largest n, for each calling convention:
-        # the Python-side input coercion loop (`_validate`, list path only)
-        # vs the Cython/C summation itself (isolated by pre-validating the
-        # list, or by going straight through the array.array buffer path,
-        # which skips `_validate()` entirely).
-        biggest = [random.uniform(-1e6, 1e6) for _ in range(sizes[-1])]
-        biggest_buf = array.array("d", biggest)
-        t_full_list = timeit(uniaccurate.shewchuk_sum, biggest)
-        t_full_buf = timeit(uniaccurate.shewchuk_sum, biggest_buf)
-        t_validate = timeit(_validate, biggest)
-        validated = _validate(biggest)
-        t_core_from_list = timeit(lambda d: _sum_shewchuk_c(d), validated)
-        t_core_from_buf = timeit(lambda d: _sum_shewchuk_buf_c(d), biggest_buf)
-        f.write(f"\n**Where the time goes** (`shewchuk_sum`, n={sizes[-1]}):\n\n")
-        f.write("| stage | ms |\n|---|---|\n")
-        f.write(f"| full call, list input | {t_full_list * 1000:.3f} |\n")
-        f.write(f"| full call, array.array input (fast path) | {t_full_buf * 1000:.3f} |\n")
-        f.write(f"| `_validate()` only (list path) | {t_validate * 1000:.3f} |\n")
-        f.write(f"| C core only, given a pre-validated list | {t_core_from_list * 1000:.3f} |\n")
-        f.write(f"| C core only, given the array.array directly (zero-copy) | {t_core_from_buf * 1000:.3f} |\n")
+        f.write(f"\n| shewchuk_sum call, n={sizes[-1]} | ms |\n|---|---|\n")
+        f.write(f"| list input | {t_full_list * 1000:.3f} |\n")
+        f.write(f"| array.array input | {t_full_buf * 1000:.3f} |\n")
     print("wrote", out_path)
 
 
