@@ -458,7 +458,7 @@ compiler.
 import uniaccurate
 
 uniaccurate.two_sum(1.0, 2e16)   # (2e16, 1.0) — error recovered
-uniaccurate.version()            # '1.0.0'
+uniaccurate.version()            # '1.1.0'
 ```
 
 Here the input check is expressed as an exception, because Python has
