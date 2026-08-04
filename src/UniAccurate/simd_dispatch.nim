@@ -80,7 +80,8 @@ when defined(amd64) and not defined(vcc):
 
   type
     NaiveDotFn = proc(x, y: openArray[float64]): float64 {.nimcall, raises: [].}
-    DotKFn = proc(x, y: openArray[float64]): (float64, bool) {.nimcall, raises: [].}
+    DotKFn = proc(x, y: openArray[float64]): (float64, bool) {.nimcall,
+        raises: [].}
 
   var naiveDotImpl: NaiveDotFn
   var dot2Impl, dotK3Impl: DotKFn

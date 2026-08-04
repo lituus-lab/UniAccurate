@@ -80,7 +80,8 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
   ## scalar IEEE result) or when a lane running sum concentrates beyond
   ## `LaneConcentrationFallback * |result|` (cancellation data) -- then the
   ## caller falls back to the scalar `dot2` body for a scalar-exact result.
-  func name(x, y: openArray[float64]): (float64, bool) {.codegenDecl: targetAttr.} =
+  func name(x, y: openArray[float64]): (float64,
+      bool) {.codegenDecl: targetAttr.} =
     if x.len == 0: return (0.0, true)
     var s = zero
     var e = zero
@@ -138,7 +139,8 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
   ## 3-fold estimates `sk + esk + eck` are merged scalarly with `neumaierSum`
   ## (its merge error is far below the K = 3 bound, so a 2-fold merge
   ## suffices). Same reliability contract as `dot2`.
-  func name(x, y: openArray[float64]): (float64, bool) {.codegenDecl: targetAttr.} =
+  func name(x, y: openArray[float64]): (float64,
+      bool) {.codegenDecl: targetAttr.} =
     if x.len == 0: return (0.0, true)
     var s = zero
     var es = zero
@@ -230,7 +232,7 @@ when defined(simd):
       for j in 0 ..< L: result += lanes[j]
       while i < n: result += x[i]; inc i
 
-  template defineCompV(name, zero, loadv, addv, storev, L: untyped,
+  template defineCompV(name, zero, loadv, addv, storev, L: untyped;
                       merge: proc(v: openArray[float64]): float64) =
     func name(x: openArray[float64]): (float64, bool) =
       if x.len == 0: return (0.0, true)
@@ -454,7 +456,7 @@ when defined(simd):
       else:
         result = naiveSum(x)
 
-  func pairwiseSimdRec[T: SomeFloat](x: openArray[T], lo, hi: int): T =
+  func pairwiseSimdRec[T: SomeFloat](x: openArray[T]; lo, hi: int): T =
     let n = hi - lo + 1
     if n <= PairwiseThreshold:
       return naiveSumSimd(toOpenArray(x, lo, hi))
