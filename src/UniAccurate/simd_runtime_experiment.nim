@@ -119,11 +119,20 @@ when defined(amd64):
     echo &"  avx512 = {rAvx512:.6f}  (|diff| = {abs(rAvx512 - rScalar):.3e})"
     echo ""
 
+    var sinkAcc: float64 = 0.0
+    proc keep(v: float64) {.inline: false.} =
+      # Non-inline sink forces every timed call's result to stay live, so
+      # the release optimizer cannot prove `discard fn(x, y)` is dead code
+      # and delete the whole loop -- confirmed on FreeBSD/Zen4 that it did
+      # exactly that for the plain scalar loop (measured 0.0000 ns/elem,
+      # which is not physically possible for a real O(n) computation).
+      sinkAcc += v
+
     proc timeit(fn: DotKernel, reps: int): float =
       result = 1e18
       for _ in 1 .. reps:
         let t0 = getMonoTime()
-        discard fn(x, y)
+        keep(fn(x, y))
         let dt = (getMonoTime() - t0).inNanoseconds.float
         if dt < result: result = dt
       result /= n.float
@@ -134,6 +143,7 @@ when defined(amd64):
     echo &"  avx512 : {timeit(naiveDotAvx512, 20):.4f}"
     echo &"  runtime dispatch (picked {dispatchedName}): ",
       &"{timeit(proc(x, y: openArray[float64]): float64 = naiveDotRuntime(x, y), 20):.4f}"
+    echo "sink = ", sinkAcc # keeps every timed call live across the whole run
 
 else:
   when isMainModule:
