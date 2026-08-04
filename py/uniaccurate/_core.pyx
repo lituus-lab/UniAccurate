@@ -53,9 +53,24 @@ cdef _sum_raw(list values, double (*fn)(const double *, size_t)):
         free(buf)
 
 
+cdef _sum_raw_buf(const double[::1] values, double (*fn)(const double *, size_t)):
+    """Zero-copy: `values` is already a contiguous double buffer (array.array,
+    a NumPy float64 array, memoryview, ...) -- call `fn` directly on its
+    backing memory, no malloc, no per-element Python object unboxing."""
+    cdef Py_ssize_t n = values.shape[0]
+    if n == 0:
+        return 0.0
+    return fn(&values[0], <size_t>n)
+
+
 def _sum_naive_c(list values):
     """Raw C call: naive sequential sum of `values` (already Python floats)."""
     return _sum_raw(values, ua_sum_naive)
+
+
+def _sum_naive_buf_c(const double[::1] values):
+    """Zero-copy raw C call: naive sequential sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_naive)
 
 
 def _sum_pairwise_c(list values):
@@ -63,9 +78,19 @@ def _sum_pairwise_c(list values):
     return _sum_raw(values, ua_sum_pairwise)
 
 
+def _sum_pairwise_buf_c(const double[::1] values):
+    """Zero-copy raw C call: recursive pairwise sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_pairwise)
+
+
 def _sum_pairwise_iterative_c(list values):
     """Raw C call: iterative pairwise sum of `values`."""
     return _sum_raw(values, ua_sum_pairwise_iterative)
+
+
+def _sum_pairwise_iterative_buf_c(const double[::1] values):
+    """Zero-copy raw C call: iterative pairwise sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_pairwise_iterative)
 
 
 def _sum_kahan_c(list values):
@@ -73,9 +98,19 @@ def _sum_kahan_c(list values):
     return _sum_raw(values, ua_sum_kahan)
 
 
+def _sum_kahan_buf_c(const double[::1] values):
+    """Zero-copy raw C call: Kahan compensated sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_kahan)
+
+
 def _sum_neumaier_c(list values):
     """Raw C call: Kahan-Babuska-Neumaier compensated sum of `values`."""
     return _sum_raw(values, ua_sum_neumaier)
+
+
+def _sum_neumaier_buf_c(const double[::1] values):
+    """Zero-copy raw C call: Kahan-Babuska-Neumaier compensated sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_neumaier)
 
 
 def _sum_klein_c(list values):
@@ -83,9 +118,19 @@ def _sum_klein_c(list values):
     return _sum_raw(values, ua_sum_klein)
 
 
+def _sum_klein_buf_c(const double[::1] values):
+    """Zero-copy raw C call: Klein two-level compensated sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_klein)
+
+
 def _sum_shewchuk_c(list values):
     """Raw C call: correctly-rounded (Shewchuk expansion) sum of `values`."""
     return _sum_raw(values, ua_sum_shewchuk)
+
+
+def _sum_shewchuk_buf_c(const double[::1] values):
+    """Zero-copy raw C call: correctly-rounded (Shewchuk expansion) sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_shewchuk)
 
 
 def _sum_exact_c(list values):
@@ -93,9 +138,19 @@ def _sum_exact_c(list values):
     return _sum_raw(values, ua_sum_exact)
 
 
+def _sum_exact_buf_c(const double[::1] values):
+    """Zero-copy raw C call: correctly-rounded (Neal superaccumulator) sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_exact)
+
+
 def _sum_oro_c(list values):
     """Raw C call: ORO sum2 (magnitude-robust compensated) sum of `values`."""
     return _sum_raw(values, ua_sum_oro)
+
+
+def _sum_oro_buf_c(const double[::1] values):
+    """Zero-copy raw C call: ORO sum2 (magnitude-robust compensated) sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_oro)
 
 
 def _sum_acc_c(list values):
@@ -103,14 +158,29 @@ def _sum_acc_c(list values):
     return _sum_raw(values, ua_sum_acc)
 
 
+def _sum_acc_buf_c(const double[::1] values):
+    """Zero-copy raw C call: Rump AccSum (faithful, within 1 ulp) sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_acc)
+
+
 def _sum_near_c(list values):
     """Raw C call: Rump NearSum (correctly rounded) sum of `values`."""
     return _sum_raw(values, ua_sum_near)
 
 
+def _sum_near_buf_c(const double[::1] values):
+    """Zero-copy raw C call: Rump NearSum (correctly rounded) sum of `values`."""
+    return _sum_raw_buf(values, ua_sum_near)
+
+
 def _condition_number_c(list values):
     """Raw C call: condition number Σ|xᵢ|/|Σxᵢ| of `values`."""
     return _sum_raw(values, ua_condition_number)
+
+
+def _condition_number_buf_c(const double[::1] values):
+    """Zero-copy raw C call: condition number Σ|xᵢ|/|Σxᵢ| of `values`."""
+    return _sum_raw_buf(values, ua_condition_number)
 
 
 cdef _sum_k_raw(list values, int k, double (*fn)(const double *, size_t, int)):
@@ -130,9 +200,23 @@ cdef _sum_k_raw(list values, int k, double (*fn)(const double *, size_t, int)):
         free(buf)
 
 
+cdef _sum_k_raw_buf(const double[::1] values, int k,
+                     double (*fn)(const double *, size_t, int)):
+    """Zero-copy: call `fn(buf, n, k)` directly on `values`'s backing memory."""
+    cdef Py_ssize_t n = values.shape[0]
+    if n == 0:
+        return 0.0
+    return fn(&values[0], <size_t>n, k)
+
+
 def _sum_k_c(list values, int k):
     """Raw C call: ORO SumK (K-fold cascaded compensated) sum of `values`."""
     return _sum_k_raw(values, k, ua_sum_k)
+
+
+def _sum_k_buf_c(const double[::1] values, int k):
+    """Zero-copy raw C call: ORO SumK (K-fold cascaded compensated) sum of `values`."""
+    return _sum_k_raw_buf(values, k, ua_sum_k)
 
 
 cdef _dot_raw(list xs, list ys, double (*fn)(const double *, const double *, size_t)):
@@ -158,9 +242,25 @@ cdef _dot_raw(list xs, list ys, double (*fn)(const double *, const double *, siz
         free(bx); free(by)
 
 
+cdef _dot_raw_buf(const double[::1] xs, const double[::1] ys,
+                   double (*fn)(const double *, const double *, size_t)):
+    """Zero-copy: call `fn` directly on `xs`/`ys`'s backing memory."""
+    cdef Py_ssize_t n = xs.shape[0]
+    if ys.shape[0] != n:
+        raise ValueError("dot product requires equal-length inputs")
+    if n == 0:
+        return 0.0
+    return fn(&xs[0], &ys[0], <size_t>n)
+
+
 def _dot_exact_c(list xs, list ys):
     """Raw C call: correctly-rounded (Neal superaccumulator) dot of `xs`·`ys`."""
     return _dot_raw(xs, ys, ua_dot_exact)
+
+
+def _dot_exact_buf_c(const double[::1] xs, const double[::1] ys):
+    """Zero-copy raw C call: correctly-rounded (Neal superaccumulator) dot of `xs`·`ys`."""
+    return _dot_raw_buf(xs, ys, ua_dot_exact)
 
 
 def _dot_naive_c(list xs, list ys):
@@ -168,9 +268,19 @@ def _dot_naive_c(list xs, list ys):
     return _dot_raw(xs, ys, ua_dot_naive)
 
 
+def _dot_naive_buf_c(const double[::1] xs, const double[::1] ys):
+    """Zero-copy raw C call: naive (left-to-right) dot of `xs`·`ys`."""
+    return _dot_raw_buf(xs, ys, ua_dot_naive)
+
+
 def _dot2_c(list xs, list ys):
     """Raw C call: twice-precision compensated dot (ORO Alg 5.3, K=2) of `xs`·`ys`."""
     return _dot_raw(xs, ys, ua_dot2)
+
+
+def _dot2_buf_c(const double[::1] xs, const double[::1] ys):
+    """Zero-copy raw C call: twice-precision compensated dot (ORO Alg 5.3, K=2) of `xs`·`ys`."""
+    return _dot_raw_buf(xs, ys, ua_dot2)
 
 
 cdef _dot_k_raw(list xs, list ys, int k,
@@ -197,6 +307,22 @@ cdef _dot_k_raw(list xs, list ys, int k,
         free(bx); free(by)
 
 
+cdef _dot_k_raw_buf(const double[::1] xs, const double[::1] ys, int k,
+                     double (*fn)(const double *, const double *, size_t, int)):
+    """Zero-copy: call `fn(buf, buf, n, k)` directly on `xs`/`ys`'s backing memory."""
+    cdef Py_ssize_t n = xs.shape[0]
+    if ys.shape[0] != n:
+        raise ValueError("dot product requires equal-length inputs")
+    if n == 0:
+        return 0.0
+    return fn(&xs[0], &ys[0], <size_t>n, k)
+
+
 def _dot_k_c(list xs, list ys, int k):
     """Raw C call: K-fold compensated dot (ORO Alg 5.3) of `xs`·`ys`."""
     return _dot_k_raw(xs, ys, k, ua_dot_k)
+
+
+def _dot_k_buf_c(const double[::1] xs, const double[::1] ys, int k):
+    """Zero-copy raw C call: K-fold compensated dot (ORO Alg 5.3) of `xs`·`ys`."""
+    return _dot_k_raw_buf(xs, ys, k, ua_dot_k)

@@ -4,22 +4,39 @@
 from ._core import two_sum as _two_sum_c, version as _version_c
 from ._core import (
     _sum_naive_c,
+    _sum_naive_buf_c,
     _sum_pairwise_c,
+    _sum_pairwise_buf_c,
     _sum_pairwise_iterative_c,
+    _sum_pairwise_iterative_buf_c,
     _sum_kahan_c,
+    _sum_kahan_buf_c,
     _sum_neumaier_c,
+    _sum_neumaier_buf_c,
     _sum_klein_c,
+    _sum_klein_buf_c,
     _sum_shewchuk_c,
+    _sum_shewchuk_buf_c,
     _sum_exact_c,
+    _sum_exact_buf_c,
     _sum_oro_c,
+    _sum_oro_buf_c,
     _sum_acc_c,
+    _sum_acc_buf_c,
     _sum_near_c,
+    _sum_near_buf_c,
     _sum_k_c,
+    _sum_k_buf_c,
     _condition_number_c,
+    _condition_number_buf_c,
     _dot_exact_c,
+    _dot_exact_buf_c,
     _dot_naive_c,
+    _dot_naive_buf_c,
     _dot2_c,
+    _dot2_buf_c,
     _dot_k_c,
+    _dot_k_buf_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -51,49 +68,95 @@ def _validate(values):
     return out
 
 
+def _as_double_buffer(values):
+    """Zero-copy contiguous double view of `values` (array.array('d', ...), a
+    NumPy float64 array, memoryview, ...), or None if unavailable.
+
+    A plain `list` does not support the buffer protocol and always returns
+    None, falling back to `_validate()` + the copying `_c` path -- this is
+    what lets `naive_sum([1.0, 2.0])` keep working exactly as before while
+    `naive_sum(array.array('d', [1.0, 2.0]))` skips both the per-element type
+    check and the per-element list-unboxing copy loop entirely (see the
+    "Python binding vs stdlib" section of the README for the measured gap
+    this closes).
+    """
+    try:
+        mv = memoryview(values)
+    except TypeError:
+        return None
+    if mv.ndim != 1 or mv.format != "d" or not mv.contiguous:
+        return None
+    return mv
+
+
 def naive_sum(values):
     """Naive (sequential) sum. Empty input is 0.0. NaN/Inf propagate.
-    Raises TypeError on non-numeric elements.
+    Raises TypeError on non-numeric elements. A contiguous float64 buffer
+    (array.array('d', ...), a NumPy float64 array, ...) skips validation and
+    copying entirely (zero-copy fast path).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_naive_buf_c(buf)
     return _sum_naive_c(_validate(values))
 
 
 def pairwise_sum(values):
     """Recursive pairwise sum. Empty input is 0.0. NaN/Inf propagate;
     opposite-sign overflow can yield NaN (no fallback). Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_pairwise_buf_c(buf)
     return _sum_pairwise_c(_validate(values))
 
 
 def pairwise_sum_iterative(values):
     """Iterative (bottom-up) pairwise sum. Empty input is 0.0. NaN/Inf
-    propagate. Raises TypeError on non-numeric elements.
+    propagate. Raises TypeError on non-numeric elements. A contiguous
+    float64 buffer uses the zero-copy fast path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_pairwise_iterative_buf_c(buf)
     return _sum_pairwise_iterative_c(_validate(values))
 
 
 def kahan_sum(values):
     """Kahan compensated sum. Empty input is 0.0. NaN/Inf propagate; finite
     inputs never yield NaN (overflow gives ±Inf). Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_kahan_buf_c(buf)
     return _sum_kahan_c(_validate(values))
 
 
 def neumaier_sum(values):
     """Kahan-Babuska-Neumaier (magnitude-robust) compensated sum. Empty input
     is 0.0. NaN/Inf propagate; finite inputs never yield NaN. Raises TypeError
-    on non-numeric elements.
+    on non-numeric elements. A contiguous float64 buffer uses the zero-copy
+    fast path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_neumaier_buf_c(buf)
     return _sum_neumaier_c(_validate(values))
 
 
 def klein_sum(values):
     """Klein two-level compensated sum (~epsilon^2). Empty input is 0.0.
     NaN/Inf propagate; finite inputs never yield NaN. Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_klein_buf_c(buf)
     return _sum_klein_c(_validate(values))
 
 
@@ -103,8 +166,12 @@ def shewchuk_sum(values):
     for finite non-overflowing input. Empty input is 0.0. NaN/Inf propagate; an
     intermediate overflow abandons the exact expansion and yields a
     correctly-signed ±Inf (finite inputs never yield NaN). Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_shewchuk_buf_c(buf)
     return _sum_shewchuk_c(_validate(values))
 
 
@@ -112,8 +179,12 @@ def exact_sum(values):
     """Correctly-rounded sum (Neal small superaccumulator: integer exact
     accumulation, single final rounding). Empty input is 0.0. NaN/Inf propagate;
     finite inputs never yield NaN (true overflow gives ±Inf, opposite-sign
-    overflow cancels exactly). Raises TypeError on non-numeric elements.
+    overflow cancels exactly). Raises TypeError on non-numeric elements. A
+    contiguous float64 buffer uses the zero-copy fast path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_exact_buf_c(buf)
     return _sum_exact_c(_validate(values))
 
 
@@ -121,7 +192,11 @@ def oro_sum(values):
     """ORO sum2 (Alg 4.1) — magnitude-robust compensated sum, value-identical to
     `neumaier_sum`. Empty input is 0.0. NaN/Inf propagate; finite inputs never
     yield NaN (overflow gives ±Inf). Raises TypeError on non-numeric elements.
+    A contiguous float64 buffer uses the zero-copy fast path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_oro_buf_c(buf)
     return _sum_oro_c(_validate(values))
 
 
@@ -130,8 +205,12 @@ def acc_sum(values):
     no float lies between the result and the exact sum). Empty input is 0.0.
     NaN/Inf propagate (non-finite input or a sigma0 overflow falls back to the
     exact superaccumulator); finite inputs never yield NaN. Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_acc_buf_c(buf)
     return _sum_acc_c(_validate(values))
 
 
@@ -140,8 +219,12 @@ def near_sum(values):
     the exact real sum, bit-for-bit. Empty input is 0.0. NaN/Inf propagate
     (non-finite input or a sigma0 overflow falls back to the exact
     superaccumulator); finite inputs never yield NaN. Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_near_buf_c(buf)
     return _sum_near_c(_validate(values))
 
 
@@ -150,10 +233,14 @@ def sum_k(values, k):
     first-order compensated (≈ `neumaier_sum`), k=3 second-order (≈
     `klein_sum`); `k < 1` is treated as 1. Empty input is 0.0. NaN/Inf propagate;
     finite inputs never yield NaN. Raises TypeError on non-numeric elements and
-    `ValueError` if `k` is not an int.
+    `ValueError` if `k` is not an int. A contiguous float64 buffer uses the
+    zero-copy fast path (see `naive_sum`).
     """
     if not isinstance(k, int) or isinstance(k, bool):
         raise ValueError(f"k must be an int, got {type(k).__name__}")
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _sum_k_buf_c(buf, k)
     return _sum_k_c(_validate(values), k)
 
 
@@ -162,8 +249,12 @@ def condition_number(values):
     §4.1): 1.0 for a no-cancellation sum, large under catastrophic cancellation,
     +inf when the sum is exactly 0 or `sum|x_i|` overflows the float range, 0.0
     for empty input. Finite inputs never yield NaN. Raises TypeError on
-    non-numeric elements.
+    non-numeric elements. A contiguous float64 buffer uses the zero-copy fast
+    path (see `naive_sum`).
     """
+    buf = _as_double_buffer(values)
+    if buf is not None:
+        return _condition_number_buf_c(buf)
     return _condition_number_c(_validate(values))
 
 
@@ -173,8 +264,12 @@ def exact_dot(xs, ys):
     Empty input is 0.0. NaN/Inf operands propagate; finite operands never yield
     NaN (products held at true magnitude, opposite-sign overflow cancels
     exactly). Raises TypeError on non-numeric elements, ValueError on
-    mismatched lengths.
+    mismatched lengths. Two contiguous float64 buffers use the zero-copy fast
+    path (see `naive_sum`).
     """
+    bx, by = _as_double_buffer(xs), _as_double_buffer(ys)
+    if bx is not None and by is not None:
+        return _dot_exact_buf_c(bx, by)
     return _dot_exact_c(_validate(xs), _validate(ys))
 
 
@@ -182,8 +277,12 @@ def naive_dot(xs, ys):
     """Naive (left-to-right) dot product `sum(x_i * y_i)`. Empty input is 0.0.
     NaN/Inf propagate; finite inputs never yield NaN (a rare opposite-sign
     product overflow to NaN is recovered via the exact superaccumulator). Raises
-    TypeError on non-numeric elements, ValueError on mismatched lengths.
+    TypeError on non-numeric elements, ValueError on mismatched lengths. Two
+    contiguous float64 buffers use the zero-copy fast path (see `naive_sum`).
     """
+    bx, by = _as_double_buffer(xs), _as_double_buffer(ys)
+    if bx is not None and by is not None:
+        return _dot_naive_buf_c(bx, by)
     return _dot_naive_c(_validate(xs), _validate(ys))
 
 
@@ -191,8 +290,12 @@ def dot2(xs, ys):
     """Compensated dot product at twice working precision (ORO Alg 5.3, K=2;
     Graillat Dot2FMA) `sum(x_i * y_i)`. Empty input is 0.0. NaN/Inf propagate;
     finite inputs never yield NaN. Raises TypeError on non-numeric elements,
-    ValueError on mismatched lengths.
+    ValueError on mismatched lengths. Two contiguous float64 buffers use the
+    zero-copy fast path (see `naive_sum`).
     """
+    bx, by = _as_double_buffer(xs), _as_double_buffer(ys)
+    if bx is not None and by is not None:
+        return _dot2_buf_c(bx, by)
     return _dot2_c(_validate(xs), _validate(ys))
 
 
@@ -201,10 +304,14 @@ def dot_k(xs, ys, k):
     naive dot, k=2 twice precision (≈ `dot2`), k=3 threefold; `k < 1` is treated
     as 1. Empty input is 0.0. NaN/Inf propagate; finite inputs never yield NaN.
     Raises TypeError on non-numeric elements, ValueError on mismatched lengths
-    or a non-int `k`.
+    or a non-int `k`. Two contiguous float64 buffers use the zero-copy fast
+    path (see `naive_sum`).
     """
     if not isinstance(k, int) or isinstance(k, bool):
         raise ValueError(f"k must be an int, got {type(k).__name__}")
+    bx, by = _as_double_buffer(xs), _as_double_buffer(ys)
+    if bx is not None and by is not None:
+        return _dot_k_buf_c(bx, by, k)
     return _dot_k_c(_validate(xs), _validate(ys), k)
 
 
