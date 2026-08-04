@@ -56,10 +56,26 @@ arrived in ADR-0007: the SIMD dot kernels (`naiveDotSimd`/`dot2Simd`/`dotK3Simd`
 now use FMA intrinsics, while the compensated-recurrence FMA ban (ADR-0004)
 still stands. `-ffp-contract=off` from `config.nims` is unchanged.
 
+**Amendment (ADR-0008).** `simd.nim` is no longer empty without `-d:simd`: the
+dot-kernel templates (`defineNaiveDotV`/`defineDot2V`/`defineDotK3V`) and their
+small dependency set (`./twosum`, `./algorithms/compensatedsum`,
+`LaneConcentrationFallback`) sit unconditionally above the gate so
+`simd_dispatch.nim` can reuse them for runtime ISA dispatch, independent of
+`-d:simd`. This adds no new real dependency (both imports were already pulled
+in unconditionally by the umbrella) and nimsimd is still never imported by this
+path without either `-d:simd` or amd64 (`simd_dispatch.nim`'s own gate).
+Invariant 1 below covers the sum family and the ISA instantiation blocks only.
+
 ## Invariants
 
-1. `-d:simd` is the master gate; without it `simd.nim` is empty and nimsimd is
-   never imported.
+1. `-d:simd` is the master gate for the sum family (`naiveSumSimd`/
+   `kahanSumSimd`/`neumaierSumSimd`/`kleinSumSimd`/`pairwiseSumSimd`) and for
+   the compile-time-locked `naiveDotSimd`/`dot2Simd`/`dotK3Simd` wrappers;
+   without it the ISA instantiation blocks (`when defined(avx512): ... elif
+   defined(avx2):`) and the NEON block never compile, and nimsimd is not
+   imported by this path. The dot-kernel templates above the gate are
+   template definitions only -- no codegen, no nimsimd import, until
+   something instantiates them (see the amendment above).
 2. The algorithm modules (`naivesum`, `pairwisesum`, `compensatedsum`) never
    import `simd` — SIMD dispatch happens at the umbrella and C ABI only.
 3. `simdF64Enabled` is false on arm64; the C ABI falls back to scalar there.

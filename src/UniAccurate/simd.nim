@@ -33,17 +33,181 @@
 ## FMA-in-SIMD-dot piece ADR-0005 deferred lands here (ADR-0007 Lever 1). nimsimd is
 ## imported inside the ISA branches only, so a scalar build (no `-d:simd`) never
 ## pulls it.
+import ./twosum
+import ./algorithms/compensatedsum
+
+const LaneConcentrationFallback* = 1024.0
+  ## Lane-concentration threshold for the compensated reliability check.
+  ##
+  ## Hoisted above the `-d:simd` gate, together with `defineNaiveDotV`/
+  ## `defineDot2V`/`defineDotK3V` below: `simd_dispatch.nim` (ADR-0008)
+  ## reuses these exact templates, unconditionally on amd64, to build the
+  ## runtime-CPUID-dispatched dot kernels `c_api.nim` calls directly -- no
+  ## `-d:simd` needed for that path.
+
+template defineNaiveDotV*(name, zero, loadv, fmaddv, storev, L: untyped;
+                          targetAttr: static string = "$# $#$#") =
+  ## K-lane strided FMA dot reduce; scalar naive merge of the K lane dots and
+  ## the tail. FMA fuses `xi*yi` into the running lane sum (one rounding
+  ## instead of two -- more accurate than scalar naive dot, still within the
+  ## naive bound). No reliability flag. `targetAttr` (default a no-op,
+  ## `codegenDecl`'s own default template) lets a caller attach a per-function
+  ## `__attribute__((target(...)))` so several ISA variants of `name` coexist
+  ## in one translation unit without a global `-mavx2`/`-mavx512f`.
+  func name(x, y: openArray[float64]): float64 {.codegenDecl: targetAttr.} =
+    if x.len == 0: return 0.0
+    var acc = zero
+    let n = x.len
+    var i = 0
+    while i + L <= n:
+      acc = fmaddv(loadv(cast[pointer](unsafeAddr x[i])),
+                   loadv(cast[pointer](unsafeAddr y[i])), acc)
+      i += L
+    var lanes: array[L, float64]
+    storev(cast[pointer](addr lanes[0]), acc)
+    result = 0.0
+    for j in 0 ..< L: result += lanes[j]
+    while i < n: result += x[i] * y[i]; inc i
+
+template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
+                     L: untyped; targetAttr: static string = "$# $#$#") =
+  ## K lanes of the Dot2 (ORO Alg. 5.3, K = 2) recurrence: per term
+  ## `h = xi*yi`, `r1 = fma(xi, yi, -h)`, `(s2, r2) = twoSum(s, h)`,
+  ## `e = (e + r1) + r2`. Scalar `neumaierSum` merge of the K lane estimates
+  ## `sk + ek`. The tail is a zero-padded final vector step so it stays
+  ## twice-precision (zero lanes contribute nothing). Returns
+  ## `(result, reliable)`: false on a non-finite result (falls back to the
+  ## scalar IEEE result) or when a lane running sum concentrates beyond
+  ## `LaneConcentrationFallback * |result|` (cancellation data) -- then the
+  ## caller falls back to the scalar `dot2` body for a scalar-exact result.
+  func name(x, y: openArray[float64]): (float64, bool) {.codegenDecl: targetAttr.} =
+    if x.len == 0: return (0.0, true)
+    var s = zero
+    var e = zero
+    let n = x.len
+    var i = 0
+    while i + L <= n:
+      let xv = loadv(cast[pointer](unsafeAddr x[i]))
+      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+      let h = mulv(xv, yv)
+      let r1 = fmaddv(xv, yv, subv(zero, h)) # xi*yi - h (exact product error)
+      let s2 = addv(s, h)
+      let z = subv(s2, s)
+      let r2 = addv(subv(s, subv(s2, z)), subv(h, z)) # twoSum(s, h) error
+      s = s2
+      e = addv(addv(e, r1), r2)
+      i += L
+    if i < n:
+      # Zero-padded final step: tail in lanes 0 ..< r, zero elsewhere. Zero
+      # lanes give h = r1 = r2 = 0 and leave s, e unchanged, so only the tail
+      # lanes advance -- twice precision without a scalar FMA.
+      var px: array[L, float64]
+      var py: array[L, float64]
+      var k = 0
+      while i < n:
+        px[k] = x[i]; py[k] = y[i]; inc i; inc k
+      let xv = loadv(cast[pointer](addr px[0]))
+      let yv = loadv(cast[pointer](addr py[0]))
+      let h = mulv(xv, yv)
+      let r1 = fmaddv(xv, yv, subv(zero, h))
+      let s2 = addv(s, h)
+      let z = subv(s2, s)
+      let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
+      s = s2
+      e = addv(addv(e, r1), r2)
+    var sl: array[L, float64]
+    var el: array[L, float64]
+    storev(cast[pointer](addr sl[0]), s)
+    storev(cast[pointer](addr el[0]), e)
+    var vals: array[L, float64]
+    for j in 0 ..< L: vals[j] = sl[j] + el[j]
+    let r = neumaierSum(vals.toOpenArray(0, L - 1))
+    var maxLane = 0.0
+    for v in sl: maxLane = max(maxLane, abs(v))
+    (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
+
+template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
+                      L: untyped; targetAttr: static string = "$# $#$#") =
+  ## K lanes of the DotK (ORO Alg. 5.3, K = 3) recurrence. Per lane the running
+  ## dot sum `s` is advanced by `twoSum(s, h)` (`h = xi*yi`, `r1 = fma` product
+  ## error), and the per-term errors `(r1, r2)` are folded into a second-order
+  ## compensated accumulator `(es, ec)` -- an online `sum2` of the error stream,
+  ## the K = 3 analog of `dot2`'s `e = (e + r1) + r2`. The tail is a zero-padded
+  ## final vector step (zero lanes contribute `r1 = r2 = 0` and leave `es`,
+  ## `ec` unchanged), keeping 3-fold precision without a scalar FMA. The K lane
+  ## 3-fold estimates `sk + esk + eck` are merged scalarly with `neumaierSum`
+  ## (its merge error is far below the K = 3 bound, so a 2-fold merge
+  ## suffices). Same reliability contract as `dot2`.
+  func name(x, y: openArray[float64]): (float64, bool) {.codegenDecl: targetAttr.} =
+    if x.len == 0: return (0.0, true)
+    var s = zero
+    var es = zero
+    var ec = zero
+    let n = x.len
+    var i = 0
+    while i + L <= n:
+      let xv = loadv(cast[pointer](unsafeAddr x[i]))
+      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+      let h = mulv(xv, yv)
+      let r1 = fmaddv(xv, yv, subv(zero, h)) # xi*yi - h (exact product error)
+      let s2 = addv(s, h)
+      let z = subv(s2, s)
+      let r2 = addv(subv(s, subv(s2, z)), subv(h, z)) # twoSum(s, h) error
+      s = s2
+      # Fold (r1, r2) into (es, ec) as an online sum2 (two twoSum steps; the
+      # second-level errors er1, er2 accumulate naively into ec).
+      let es2 = addv(es, r1)
+      let zr1 = subv(es2, es)
+      let er1 = addv(subv(es, subv(es2, zr1)), subv(r1, zr1))
+      es = es2
+      let es3 = addv(es, r2)
+      let zr2 = subv(es3, es)
+      let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
+      es = es3
+      ec = addv(ec, addv(er1, er2))
+      i += L
+    if i < n:
+      var px: array[L, float64]
+      var py: array[L, float64]
+      var k = 0
+      while i < n:
+        px[k] = x[i]; py[k] = y[i]; inc i; inc k
+      let xv = loadv(cast[pointer](addr px[0]))
+      let yv = loadv(cast[pointer](addr py[0]))
+      let h = mulv(xv, yv)
+      let r1 = fmaddv(xv, yv, subv(zero, h))
+      let s2 = addv(s, h)
+      let z = subv(s2, s)
+      let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
+      s = s2
+      let es2 = addv(es, r1)
+      let zr1 = subv(es2, es)
+      let er1 = addv(subv(es, subv(es2, zr1)), subv(r1, zr1))
+      es = es2
+      let es3 = addv(es, r2)
+      let zr2 = subv(es3, es)
+      let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
+      es = es3
+      ec = addv(ec, addv(er1, er2))
+    var sl: array[L, float64]
+    var esl: array[L, float64]
+    var ecl: array[L, float64]
+    storev(cast[pointer](addr sl[0]), s)
+    storev(cast[pointer](addr esl[0]), es)
+    storev(cast[pointer](addr ecl[0]), ec)
+    var vals: array[L, float64]
+    for j in 0 ..< L: vals[j] = sl[j] + esl[j] + ecl[j]
+    let r = neumaierSum(vals.toOpenArray(0, L - 1))
+    var maxLane = 0.0
+    for v in sl: maxLane = max(maxLane, abs(v))
+    (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
+
 when defined(simd):
   import contracts
   import std/math
-  import ./twosum
   import ./algorithms/naivesum
   import ./algorithms/pairwisesum
-  import ./algorithms/compensatedsum
   import ./algorithms/dotproduct
-
-  const LaneConcentrationFallback* = 1024.0
-    ## Lane-concentration threshold for the compensated reliability check.
 
   const
     simdF64Enabled* = defined(avx2) or defined(avx512)
@@ -86,159 +250,6 @@ when defined(simd):
       let r = merge(vals.toOpenArray(0, L))
       var maxLane = 0.0
       for v in vals: maxLane = max(maxLane, abs(v))
-      (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
-
-  template defineNaiveDotV(name, zero, loadv, fmaddv, storev, L: untyped) =
-    ## K-lane strided FMA dot reduce; scalar naive merge of the K lane dots and
-    ## the tail. FMA fuses `xᵢ·yᵢ` into the running lane sum (one rounding
-    ## instead of two — more accurate than scalar naive dot, still within the
-    ## naive bound). No reliability flag.
-    func name(x, y: openArray[float64]): float64 =
-      if x.len == 0: return 0.0
-      var acc = zero
-      let n = x.len
-      var i = 0
-      while i + L <= n:
-        acc = fmaddv(loadv(cast[pointer](unsafeAddr x[i])),
-                     loadv(cast[pointer](unsafeAddr y[i])), acc)
-        i += L
-      var lanes: array[L, float64]
-      storev(cast[pointer](addr lanes[0]), acc)
-      result = 0.0
-      for j in 0 ..< L: result += lanes[j]
-      while i < n: result += x[i] * y[i]; inc i
-
-  template defineDot2V(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
-                       L: untyped) =
-    ## K lanes of the Dot2 (ORO Alg. 5.3, K = 2) recurrence: per term
-    ## `h = xᵢ·yᵢ`, `r₁ = fma(xᵢ, yᵢ, −h)`, `(s₂, r₂) = twoSum(s, h)`,
-    ## `e = (e + r₁) + r₂`. Scalar `neumaierSum` merge of the K lane estimates
-    ## `sₖ + eₖ`. The tail is a zero-padded final vector step so it stays
-    ## twice-precision (zero lanes contribute nothing). Returns
-    ## `(result, reliable)`: false on a non-finite result (→ scalar IEEE
-    ## fallback) or when a lane running sum concentrates beyond
-    ## `LaneConcentrationFallback · |result|` (cancellation data) — then the
-    ## caller falls back to the scalar `dot2` body for a scalar-exact result.
-    func name(x, y: openArray[float64]): (float64, bool) =
-      if x.len == 0: return (0.0, true)
-      var s = zero
-      var e = zero
-      let n = x.len
-      var i = 0
-      while i + L <= n:
-        let xv = loadv(cast[pointer](unsafeAddr x[i]))
-        let yv = loadv(cast[pointer](unsafeAddr y[i]))
-        let h = mulv(xv, yv)
-        let r1 = fmaddv(xv, yv, subv(zero, h)) # xᵢ·yᵢ − h (exact product error)
-        let s2 = addv(s, h)
-        let z = subv(s2, s)
-        let r2 = addv(subv(s, subv(s2, z)), subv(h, z)) # twoSum(s, h) error
-        s = s2
-        e = addv(addv(e, r1), r2)
-        i += L
-      if i < n:
-        # Zero-padded final step: tail in lanes 0 ..< r, zero elsewhere. Zero
-        # lanes give h = r1 = r2 = 0 and leave s, e unchanged, so only the tail
-        # lanes advance — twice precision without a scalar FMA.
-        var px: array[L, float64]
-        var py: array[L, float64]
-        var k = 0
-        while i < n:
-          px[k] = x[i]; py[k] = y[i]; inc i; inc k
-        let xv = loadv(cast[pointer](addr px[0]))
-        let yv = loadv(cast[pointer](addr py[0]))
-        let h = mulv(xv, yv)
-        let r1 = fmaddv(xv, yv, subv(zero, h))
-        let s2 = addv(s, h)
-        let z = subv(s2, s)
-        let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
-        s = s2
-        e = addv(addv(e, r1), r2)
-      var sl: array[L, float64]
-      var el: array[L, float64]
-      storev(cast[pointer](addr sl[0]), s)
-      storev(cast[pointer](addr el[0]), e)
-      var vals: array[L, float64]
-      for j in 0 ..< L: vals[j] = sl[j] + el[j]
-      let r = neumaierSum(vals.toOpenArray(0, L - 1))
-      var maxLane = 0.0
-      for v in sl: maxLane = max(maxLane, abs(v))
-      (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
-
-  template defineDotK3V(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
-                        L: untyped) =
-    ## K lanes of the DotK (ORO Alg. 5.3, K = 3) recurrence. Per lane the running
-    ## dot sum `s` is advanced by `twoSum(s, h)` (`h = xᵢ·yᵢ`, `r₁ = fma` product
-    ## error), and the per-term errors `(r₁, r₂)` are folded into a second-order
-    ## compensated accumulator `(es, ec)` — an online `sum2` of the error stream,
-    ## the K = 3 analog of `dot2`'s `e = (e + r₁) + r₂`. The tail is a zero-padded
-    ## final vector step (zero lanes contribute `r₁ = r₂ = 0` and leave `es`,
-    ## `ec` unchanged), keeping 3-fold precision without a scalar FMA. The K lane
-    ## 3-fold estimates `sₖ + esₖ + ecₖ` are merged scalarly with `neumaierSum`
-    ## (its `γ_K·Σ|xᵢyᵢ|` merge error is far below the K = 3 bound, so a 2-fold
-    ## merge suffices). Same reliability contract as `dot2`.
-    func name(x, y: openArray[float64]): (float64, bool) =
-      if x.len == 0: return (0.0, true)
-      var s = zero
-      var es = zero
-      var ec = zero
-      let n = x.len
-      var i = 0
-      while i + L <= n:
-        let xv = loadv(cast[pointer](unsafeAddr x[i]))
-        let yv = loadv(cast[pointer](unsafeAddr y[i]))
-        let h = mulv(xv, yv)
-        let r1 = fmaddv(xv, yv, subv(zero, h)) # xᵢ·yᵢ − h (exact product error)
-        let s2 = addv(s, h)
-        let z = subv(s2, s)
-        let r2 = addv(subv(s, subv(s2, z)), subv(h, z)) # twoSum(s, h) error
-        s = s2
-        # Fold (r1, r2) into (es, ec) as an online sum2 (two twoSum steps; the
-        # second-level errors er1, er2 accumulate naively into ec).
-        let es2 = addv(es, r1)
-        let zr1 = subv(es2, es)
-        let er1 = addv(subv(es, subv(es2, zr1)), subv(r1, zr1))
-        es = es2
-        let es3 = addv(es, r2)
-        let zr2 = subv(es3, es)
-        let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
-        es = es3
-        ec = addv(ec, addv(er1, er2))
-        i += L
-      if i < n:
-        var px: array[L, float64]
-        var py: array[L, float64]
-        var k = 0
-        while i < n:
-          px[k] = x[i]; py[k] = y[i]; inc i; inc k
-        let xv = loadv(cast[pointer](addr px[0]))
-        let yv = loadv(cast[pointer](addr py[0]))
-        let h = mulv(xv, yv)
-        let r1 = fmaddv(xv, yv, subv(zero, h))
-        let s2 = addv(s, h)
-        let z = subv(s2, s)
-        let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
-        s = s2
-        let es2 = addv(es, r1)
-        let zr1 = subv(es2, es)
-        let er1 = addv(subv(es, subv(es2, zr1)), subv(r1, zr1))
-        es = es2
-        let es3 = addv(es, r2)
-        let zr2 = subv(es3, es)
-        let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
-        es = es3
-        ec = addv(ec, addv(er1, er2))
-      var sl: array[L, float64]
-      var esl: array[L, float64]
-      var ecl: array[L, float64]
-      storev(cast[pointer](addr sl[0]), s)
-      storev(cast[pointer](addr esl[0]), es)
-      storev(cast[pointer](addr ecl[0]), ec)
-      var vals: array[L, float64]
-      for j in 0 ..< L: vals[j] = sl[j] + esl[j] + ecl[j]
-      let r = neumaierSum(vals.toOpenArray(0, L - 1))
-      var maxLane = 0.0
-      for v in sl: maxLane = max(maxLane, abs(v))
       (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
 
   when defined(avx512):

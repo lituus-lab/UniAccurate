@@ -55,6 +55,13 @@ task oro, "ORO/Rump summation tests (debug, contracts active)":
 task dot, "Dot product tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_dot tests/test_dotproduct.nim"
 
+task dispatch, "Runtime AVX2/AVX-512 dot dispatch tests (ADR-0008)":
+  # -d:release, not debug: simd_dispatch.nim's {.raises: [].} on its scalar
+  # fallback wrappers only holds once NimContracts' require/ensure on
+  # naiveDot/dot2/dotK compile away (AGENTS.md) -- the real c_api.nim build is
+  # always -d:release, so this test exercises the module the way it ships.
+  exec "nim c -r -d:release --path:src -o:build/test_dispatch tests/test_simd_dispatch.nim"
+
 task expansions, "Shewchuk expansion tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_expansions tests/test_expansions.nim"
 
@@ -69,6 +76,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nimble exact"
   exec "nimble oro"
   exec "nimble dot"
+  exec "nimble dispatch"
   exec "nimble expansions"
   exec "nimble prop"
 
@@ -81,6 +89,7 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_dispatch_rel tests/test_simd_dispatch.nim"
   exec "nim c -r -d:release --path:src -o:build/test_expansions_rel tests/test_expansions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
@@ -92,6 +101,7 @@ task testCi, "Nim tests (CI subset, debug)":
   exec "nimble exact"
   exec "nimble oro"
   exec "nimble dot"
+  exec "nimble dispatch"
   exec "nimble expansions"
   exec "nimble prop"
 
@@ -104,6 +114,7 @@ task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_dispatch_rel tests/test_simd_dispatch.nim"
   exec "nim c -r -d:release --path:src -o:build/test_expansions_rel tests/test_expansions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
 
@@ -201,15 +212,6 @@ task ctestSimd, "C ABI tests with -d:simd (host ISA)":
        " -o:" & staticLib & " src/UniAccurate/c_api.nim"
   exec makeExe & " -C tests/c"
 
-task simdRuntimeExperiment, "EXPERIMENTAL runtime AVX2/AVX-512 dispatch prototype (amd64 only, unverified off amd64)":
-  # -d:useFMA: without it, twoProductFMA's libm fma() call (a real,
-  # un-inlinable external call) isn't lowered to the hardware instruction --
-  # the scalar dot2/dotK3 baselines would otherwise measure the ADR-0007
-  # Lever 1 FMA cliff (24.5 -> 1.70 ns/elem on Zen4) instead of the SIMD
-  # kernels' own gain, which already use FMA intrinsics directly regardless.
-  exec "nim c -r -d:release -d:useFMA --path:src -o:build/simd_runtime_experiment" &
-       " src/UniAccurate/simd_runtime_experiment.nim"
-
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
   exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
 
@@ -253,6 +255,15 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   ]
   for t in covTests:
     exec "nim c --path:src --nimcache:" & cache &
+         " --debugger:native --passC:--coverage --passL:--coverage" &
+         " -o:build/cov_" & t & " tests/" & t & ".nim"
+    exec "./build/cov_" & t
+  # test_simd_dispatch needs -d:release, same as the dispatch task: debug-mode
+  # NimContracts on naiveDot/dot2/dotK (compiled away in release) breaks the
+  # {.raises: [].} on simd_dispatch.nim's scalar fallback wrappers.
+  block:
+    const t = "test_simd_dispatch"
+    exec "nim c -d:release --path:src --nimcache:" & cache &
          " --debugger:native --passC:--coverage --passL:--coverage" &
          " -o:build/cov_" & t & " tests/" & t & ".nim"
     exec "./build/cov_" & t
