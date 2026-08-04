@@ -171,6 +171,35 @@ Python 3.14.6 (CPython)
 | list input | 12.974 |
 | array.array input | 9.086 |
 
+**Python binding vs stdlib** (`nimble benchPython`)
+
+Python 3.14.6 (CPython)
+
+| comparison | n | uniaccurate (ms) | reference (ms) | ratio (uniaccurate/reference) | same result? |
+|---|---|---|---|---|---|
+| shewchuk_sum vs math.fsum | 1000 | 0.066 | 0.007 | 9.89x | yes |
+| naive_sum vs sum() | 1000 | 0.060 | 0.002 | 34.36x | NO |
+| shewchuk_sum vs math.fsum | 100000 | 6.869 | 0.870 | 7.89x | yes |
+| naive_sum vs sum() | 100000 | 5.682 | 0.179 | 31.65x | NO |
+| shewchuk_sum vs math.fsum | 1000000 | 65.786 | 8.798 | 7.48x | yes |
+| naive_sum vs sum() | 1000000 | 57.392 | 1.968 | 29.17x | NO |
+
+**Why `naive_sum` vs `sum()` says NO**: on this interpreter, `sum()` is not naive -- it already matches the correctly-rounded reference (`shewchuk_sum`) exactly, while `naive_sum` (a plain left-to-right loop) carries real rounding error:
+
+| n | \|naive_sum - correct\| | \|sum() - correct\| |
+|---|---|---|
+| 1000 | 9.313e-09 | 0.000e+00 |
+| 100000 | 7.749e-07 | 0.000e+00 |
+| 1000000 | 1.568e-05 | 0.000e+00 |
+
+**Where the time goes** (`shewchuk_sum`, n=1000000): most of the gap above is the Python-side input-coercion loop, not the C summation itself:
+
+| stage | ms |
+|---|---|
+| full `shewchuk_sum` call | 66.189 |
+| `_validate()` only | 55.923 |
+| C core only (pre-validated) | 10.075 |
+
 <!-- /bench:machine=macosx-apple-m4 -->
 
 See ADR-0007 for the full lever-by-lever analysis (the `isFin` bit-mask, FMA
