@@ -26,9 +26,10 @@
 ## 3.14x (AVX-512) SIMD-only, negligible dispatch overhead. `dot2`/`dotK3`
 ## measured 5.09x/7.47x and 3.96x/5.05x (SIMD-only / vs. real-world default)
 ## for that same shape without the `(float64, bool)` reliability tuple this
-## module adds. Applying `codegenDecl`'s `target` attribute to a
-## tuple-returning func is a new combination not itself run on hardware --
-## see ADR-0008 for what still needs a fresh hardware round.
+## module adds. The tuple-returning shape was validated on the same class of
+## hardware in a later round -- both ISA variants emit their own registers
+## under the per-function `target` attribute alone -- see ADR-0008's
+## Verification, including the lane-merge bug that round uncovered.
 ##
 ## NEON float64 does not exist (simd.nim's own documented constraint), so
 ## non-amd64 targets get no acceleration here: `dispatch*` delegates straight

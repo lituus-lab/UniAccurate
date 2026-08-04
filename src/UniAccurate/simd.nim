@@ -116,15 +116,17 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
       let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
       s = s2
       e = addv(addv(e, r1), r2)
-    var sl: array[L, float64]
-    var el: array[L, float64]
-    storev(cast[pointer](addr sl[0]), s)
-    storev(cast[pointer](addr el[0]), e)
-    var vals: array[L, float64]
-    for j in 0 ..< L: vals[j] = sl[j] + el[j]
-    let r = neumaierSum(vals.toOpenArray(0, L - 1))
+    # Merge the L lane sums and their L compensations as 2L separate addends.
+    # Collapsing each lane to `sl[j] + el[j]` first rounds the compensation
+    # away, costing ~eps*max|sl| -- on cancellation data max|sl| >> |result|,
+    # so that overshoots the twice-precision bound while the lane-concentration
+    # check below still reads "reliable" (ADR-0008 Verification).
+    var vals: array[2 * L, float64]
+    storev(cast[pointer](addr vals[0]), s)
+    storev(cast[pointer](addr vals[L]), e)
+    let r = neumaierSum(vals.toOpenArray(0, 2 * L - 1))
     var maxLane = 0.0
-    for v in sl: maxLane = max(maxLane, abs(v))
+    for j in 0 ..< L: maxLane = max(maxLane, abs(vals[j]))
     (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
 
 template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
@@ -135,10 +137,10 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
   ## compensated accumulator `(es, ec)` -- an online `sum2` of the error stream,
   ## the K = 3 analog of `dot2`'s `e = (e + r1) + r2`. The tail is a zero-padded
   ## final vector step (zero lanes contribute `r1 = r2 = 0` and leave `es`,
-  ## `ec` unchanged), keeping 3-fold precision without a scalar FMA. The K lane
-  ## 3-fold estimates `sk + esk + eck` are merged scalarly with `neumaierSum`
-  ## (its merge error is far below the K = 3 bound, so a 2-fold merge
-  ## suffices). Same reliability contract as `dot2`.
+  ## `ec` unchanged), keeping 3-fold precision without a scalar FMA. The `3L`
+  ## lane parts `sk`, `esk`, `eck` are merged scalarly with `neumaierSum` as
+  ## separate addends (its merge error is far below the K = 3 bound, so a
+  ## 2-fold merge suffices). Same reliability contract as `dot2`.
   func name(x, y: openArray[float64]): (float64,
       bool) {.codegenDecl: targetAttr.} =
     if x.len == 0: return (0.0, true)
@@ -191,17 +193,16 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
       let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
       es = es3
       ec = addv(ec, addv(er1, er2))
-    var sl: array[L, float64]
-    var esl: array[L, float64]
-    var ecl: array[L, float64]
-    storev(cast[pointer](addr sl[0]), s)
-    storev(cast[pointer](addr esl[0]), es)
-    storev(cast[pointer](addr ecl[0]), ec)
-    var vals: array[L, float64]
-    for j in 0 ..< L: vals[j] = sl[j] + esl[j] + ecl[j]
-    let r = neumaierSum(vals.toOpenArray(0, L - 1))
+    # 3L separate addends, same reason as `defineDot2V`: a per-lane
+    # `sl[j] + esl[j] + ecl[j]` would round the 3-fold compensation away
+    # before the merge.
+    var vals: array[3 * L, float64]
+    storev(cast[pointer](addr vals[0]), s)
+    storev(cast[pointer](addr vals[L]), es)
+    storev(cast[pointer](addr vals[2 * L]), ec)
+    let r = neumaierSum(vals.toOpenArray(0, 3 * L - 1))
     var maxLane = 0.0
-    for v in sl: maxLane = max(maxLane, abs(v))
+    for j in 0 ..< L: maxLane = max(maxLane, abs(vals[j]))
     (r, isFin(r) and maxLane <= LaneConcentrationFallback * abs(r))
 
 when defined(simd):
