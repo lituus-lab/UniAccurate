@@ -8,8 +8,12 @@
 # BIN, RUN, RM_F, LIBS) come from `UniAccurate.nimble`'s `make` invocation as
 # command-line variable assignments instead, which take precedence over `?=`
 # on every make flavor without needing an in-Makefile OS branch.
+#
+# ROOT stays relative: `$(CURDIR)` is a GNU make builtin that BSD make leaves
+# empty (it spells it `.CURDIR`), which made ROOT `/../..`. Both flavors chdir
+# for `-C` before reading this file, so a relative path needs no builtin.
 CC     ?= cc
-ROOT   := $(CURDIR)/../..
+ROOT   := ../..
 CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
 LIB    := $(ROOT)/libUniAccurate.a
 BIN    ?= test_uniaccurate

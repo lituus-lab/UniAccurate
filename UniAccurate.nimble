@@ -174,7 +174,7 @@ const makeWinArgs =
   else: ""
 const makeWinArgsExample =
   when defined(windows):
-    " CC=gcc BIN=demo.exe RUN=demo.exe RM_F=\"del /q\""
+    " CC=gcc BIN=demo.exe RUN=demo.exe RM_F=\"del /q\" LIBS="
   else: ""
 
 # `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
