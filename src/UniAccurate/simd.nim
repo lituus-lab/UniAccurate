@@ -380,15 +380,14 @@ when defined(simd):
         let r2 = vaddq_f32(vsubq_f32(s, vsubq_f32(s2, z)), vsubq_f32(h, z))
         s = s2
         e = vaddq_f32(vaddq_f32(e, r1), r2)
-      var sl: array[L, float32]
-      var el: array[L, float32]
-      vst1q_f32(cast[pointer](addr sl[0]), s)
-      vst1q_f32(cast[pointer](addr el[0]), e)
-      var vals: array[L, float32]
-      for j in 0 ..< L: vals[j] = sl[j] + el[j]
-      let r = neumaierSum(vals.toOpenArray(0, L - 1))
+      # 2L separate addends, not pre-collapsed: see defineDot2V's ADR-0008 note
+      # -- `sl[j] + el[j]` before the merge rounds the compensation away.
+      var vals: array[2 * L, float32]
+      vst1q_f32(cast[pointer](addr vals[0]), s)
+      vst1q_f32(cast[pointer](addr vals[L]), e)
+      let r = neumaierSum(vals.toOpenArray(0, 2 * L - 1))
       var maxLane = 0.0'f32
-      for v in sl: maxLane = max(maxLane, abs(v))
+      for j in 0 ..< L: maxLane = max(maxLane, abs(vals[j]))
       (r, isFin(r) and maxLane <= float32(LaneConcentrationFallback) * abs(r))
 
     func dotK3SimdNeonF32(x, y: openArray[float32]): SimdResult[float32] =
@@ -441,17 +440,14 @@ when defined(simd):
         let er2 = vaddq_f32(vsubq_f32(es, vsubq_f32(es3, zr2)), vsubq_f32(r2, zr2))
         es = es3
         ec = vaddq_f32(ec, vaddq_f32(er1, er2))
-      var sl: array[L, float32]
-      var esl: array[L, float32]
-      var ecl: array[L, float32]
-      vst1q_f32(cast[pointer](addr sl[0]), s)
-      vst1q_f32(cast[pointer](addr esl[0]), es)
-      vst1q_f32(cast[pointer](addr ecl[0]), ec)
-      var vals: array[L, float32]
-      for j in 0 ..< L: vals[j] = sl[j] + esl[j] + ecl[j]
-      let r = neumaierSum(vals.toOpenArray(0, L - 1))
+      # 3L separate addends, same reason as dot2SimdNeonF32.
+      var vals: array[3 * L, float32]
+      vst1q_f32(cast[pointer](addr vals[0]), s)
+      vst1q_f32(cast[pointer](addr vals[L]), es)
+      vst1q_f32(cast[pointer](addr vals[2 * L]), ec)
+      let r = neumaierSum(vals.toOpenArray(0, 3 * L - 1))
       var maxLane = 0.0'f32
-      for v in sl: maxLane = max(maxLane, abs(v))
+      for j in 0 ..< L: maxLane = max(maxLane, abs(vals[j]))
       (r, isFin(r) and maxLane <= float32(LaneConcentrationFallback) * abs(r))
 
   func naiveSumSimd*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
