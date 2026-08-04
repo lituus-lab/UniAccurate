@@ -163,14 +163,28 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
 # Nim's MinGW toolchain names it mingw32-make.
 let makeExe = if findExe("mingw32-make").len > 0: "mingw32-make" else: "make"
 
+# Windows-only variable overrides, passed on the make command line (wins over
+# the Makefiles' own `?=` defaults on every make flavor) instead of an
+# in-Makefile OS conditional -- GNU make, BSD make (FreeBSD's default `make`),
+# and mingw32-make share no common `ifeq`/`.if` directive syntax.
+const makeWinArgs =
+  when defined(windows):
+    " CC=gcc BIN=test_uniaccurate.exe RUN=test_uniaccurate.exe" &
+    " RM_F=\"del /q\" LIBS="
+  else: ""
+const makeWinArgsExample =
+  when defined(windows):
+    " CC=gcc BIN=demo.exe RUN=demo.exe RM_F=\"del /q\""
+  else: ""
+
 # `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
 task ctest, "C ABI tests":
   exec "nimble clibStatic"
-  exec makeExe & " -C tests/c"
+  exec makeExe & " -C tests/c" & makeWinArgs
 
 task cexample, "C demo":
   exec "nimble clibStatic"
-  exec makeExe & " -C examples/c"
+  exec makeExe & " -C examples/c" & makeWinArgsExample
 
 task simd, "Run test_simd with -d:simd (host-default ISA)":
   exec "nim c -r -d:simd --path:src -o:build/test_simd tests/test_simd.nim"
@@ -210,7 +224,7 @@ task clibSimd, "C shared library with -d:simd (host ISA)":
 task ctestSimd, "C ABI tests with -d:simd (host ISA)":
   exec "nim c --app:staticlib --noMain --mm:arc -d:release -d:simd" & simdArch &
        " -o:" & staticLib & " src/UniAccurate/c_api.nim"
-  exec makeExe & " -C tests/c"
+  exec makeExe & " -C tests/c" & makeWinArgs
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
   exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
