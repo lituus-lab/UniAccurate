@@ -129,6 +129,41 @@ def test_numpy_2d_array_falls_back_and_rejects():
         uniaccurate.naive_sum(arr2d)
 
 
+def test_numpy_float32_array_accepted_directly():
+    # A non-float64 dtype array can't take the double[::1] buffer fast path,
+    # so it falls through to the per-element generic path -- where each
+    # element is a real numpy.float32 scalar (not a Python float), previously
+    # rejected as "not a number".
+    np = pytest.importorskip("numpy")
+    values = _data(n=50)
+    arr = np.array(values, dtype=np.float32)
+    assert uniaccurate.naive_sum(arr) == uniaccurate.naive_sum([float(v) for v in arr])
+
+
+def test_numpy_int32_array_accepted_directly():
+    np = pytest.importorskip("numpy")
+    arr = np.array([1, 2, 3, 4, 5], dtype=np.int32)
+    assert uniaccurate.naive_sum(arr) == 15.0
+
+
+def test_numpy_scalar_list_accepted():
+    np = pytest.importorskip("numpy")
+    assert uniaccurate.naive_sum([np.float32(1.5), np.int64(2), np.float64(3.5)]) == 7.0
+
+
+def test_numpy_bool_still_rejected():
+    np = pytest.importorskip("numpy")
+    with pytest.raises(TypeError):
+        uniaccurate.naive_sum([np.bool_(True), 1.0])
+
+
+def test_numpy_float32_dot_accepted_directly():
+    np = pytest.importorskip("numpy")
+    x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    y = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+    assert uniaccurate.dot2(x, y) == 32.0
+
+
 def test_numpy_strided_view_matches_list():
     np = pytest.importorskip("numpy")
     values = _data(n=2000)
