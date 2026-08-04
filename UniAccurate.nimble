@@ -201,6 +201,10 @@ task ctestSimd, "C ABI tests with -d:simd (host ISA)":
        " -o:" & staticLib & " src/UniAccurate/c_api.nim"
   exec makeExe & " -C tests/c"
 
+task simdRuntimeExperiment, "EXPERIMENTAL runtime AVX2/AVX-512 dispatch prototype (amd64 only, unverified off amd64)":
+  exec "nim c -r -d:release --path:src -o:build/simd_runtime_experiment" &
+       " src/UniAccurate/simd_runtime_experiment.nim"
+
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
   exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
 
