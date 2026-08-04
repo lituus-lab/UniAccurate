@@ -263,6 +263,11 @@ proc main() =
         let v = cell.getOrDefault(("f64", algo, n, be))
         row &= " " & (if v > 0: v.formatFloat(ffDecimal, 4) else: "-") & " |"
       body &= row & "\n"
+    const pyFrag = "bench/.md_python.md"
+    if fileExists(pyFrag):
+      body &= "\n**Python binding vs stdlib** (`nimble benchPython`)\n\n" & readFile(pyFrag)
+    else:
+      stderr.writeLine("[readme] no " & pyFrag & " -- run `nimble benchPython` too for the Python comparison")
     spliceReadme(machineSlug(), body)
 
 when isMainModule:
