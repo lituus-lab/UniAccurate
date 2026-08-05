@@ -97,9 +97,7 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
     var e = zero
     let n = x.len
     var i = 0
-    while i + L <= n:
-      let xv = loadv(cast[pointer](unsafeAddr x[i]))
-      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+    template dot2Step(xv, yv: untyped) =
       let h = mulv(xv, yv)
       let r1 = fmaddv(xv, yv, subv(zero, h)) # xi*yi - h (exact product error)
       let s2 = addv(s, h)
@@ -107,6 +105,10 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
       let r2 = addv(subv(s, subv(s2, z)), subv(h, z)) # twoSum(s, h) error
       s = s2
       e = addv(addv(e, r1), r2)
+    while i + L <= n:
+      let xv = loadv(cast[pointer](unsafeAddr x[i]))
+      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+      dot2Step(xv, yv)
       i += L
     if i < n:
       # Zero-padded final step: tail in lanes 0 ..< r, zero elsewhere. Zero
@@ -119,13 +121,7 @@ template defineDot2V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
         px[k] = x[i]; py[k] = y[i]; inc i; inc k
       let xv = loadv(cast[pointer](addr px[0]))
       let yv = loadv(cast[pointer](addr py[0]))
-      let h = mulv(xv, yv)
-      let r1 = fmaddv(xv, yv, subv(zero, h))
-      let s2 = addv(s, h)
-      let z = subv(s2, s)
-      let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
-      s = s2
-      e = addv(addv(e, r1), r2)
+      dot2Step(xv, yv)
     # Merge the L lane sums and their L compensations as 2L separate addends.
     # Collapsing each lane to `sl[j] + el[j]` first rounds the compensation
     # away, costing ~eps*max|sl| -- on cancellation data max|sl| >> |result|,
@@ -159,9 +155,7 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
     var ec = zero
     let n = x.len
     var i = 0
-    while i + L <= n:
-      let xv = loadv(cast[pointer](unsafeAddr x[i]))
-      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+    template dotK3Step(xv, yv: untyped) =
       let h = mulv(xv, yv)
       let r1 = fmaddv(xv, yv, subv(zero, h)) # xi*yi - h (exact product error)
       let s2 = addv(s, h)
@@ -179,6 +173,10 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
       let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
       es = es3
       ec = addv(ec, addv(er1, er2))
+    while i + L <= n:
+      let xv = loadv(cast[pointer](unsafeAddr x[i]))
+      let yv = loadv(cast[pointer](unsafeAddr y[i]))
+      dotK3Step(xv, yv)
       i += L
     if i < n:
       var px: array[L, float64]
@@ -188,21 +186,7 @@ template defineDotK3V*(name, zero, loadv, mulv, fmaddv, addv, subv, storev,
         px[k] = x[i]; py[k] = y[i]; inc i; inc k
       let xv = loadv(cast[pointer](addr px[0]))
       let yv = loadv(cast[pointer](addr py[0]))
-      let h = mulv(xv, yv)
-      let r1 = fmaddv(xv, yv, subv(zero, h))
-      let s2 = addv(s, h)
-      let z = subv(s2, s)
-      let r2 = addv(subv(s, subv(s2, z)), subv(h, z))
-      s = s2
-      let es2 = addv(es, r1)
-      let zr1 = subv(es2, es)
-      let er1 = addv(subv(es, subv(es2, zr1)), subv(r1, zr1))
-      es = es2
-      let es3 = addv(es, r2)
-      let zr2 = subv(es3, es)
-      let er2 = addv(subv(es, subv(es3, zr2)), subv(r2, zr2))
-      es = es3
-      ec = addv(ec, addv(er1, er2))
+      dotK3Step(xv, yv)
     # 3L separate addends, same reason as `defineDot2V`: a per-lane
     # `sl[j] + esl[j] + ecl[j]` would round the 3-fold compensation away
     # before the merge.
@@ -353,9 +337,7 @@ when defined(simd):
       var e = vmovq_n_f32(0.0'f32)
       let n = x.len
       var i = 0
-      while i + L <= n:
-        let xv = vld1q_f32(cast[pointer](unsafeAddr x[i]))
-        let yv = vld1q_f32(cast[pointer](unsafeAddr y[i]))
+      template dot2Step(xv, yv: untyped) =
         let h = vmulq_f32(xv, yv)
         let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv,
             yv) # xᵢ·yᵢ − h (exact product error)
@@ -364,6 +346,10 @@ when defined(simd):
         let r2 = vaddq_f32(vsubq_f32(s, vsubq_f32(s2, z)), vsubq_f32(h, z))
         s = s2
         e = vaddq_f32(vaddq_f32(e, r1), r2)
+      while i + L <= n:
+        let xv = vld1q_f32(cast[pointer](unsafeAddr x[i]))
+        let yv = vld1q_f32(cast[pointer](unsafeAddr y[i]))
+        dot2Step(xv, yv)
         i += L
       if i < n:
         var px: array[L, float32]
@@ -373,13 +359,7 @@ when defined(simd):
           px[k] = x[i]; py[k] = y[i]; inc i; inc k
         let xv = vld1q_f32(cast[pointer](addr px[0]))
         let yv = vld1q_f32(cast[pointer](addr py[0]))
-        let h = vmulq_f32(xv, yv)
-        let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv, yv)
-        let s2 = vaddq_f32(s, h)
-        let z = vsubq_f32(s2, s)
-        let r2 = vaddq_f32(vsubq_f32(s, vsubq_f32(s2, z)), vsubq_f32(h, z))
-        s = s2
-        e = vaddq_f32(vaddq_f32(e, r1), r2)
+        dot2Step(xv, yv)
       # 2L separate addends, not pre-collapsed: see defineDot2V's ADR-0008 note
       # -- `sl[j] + el[j]` before the merge rounds the compensation away.
       var vals: array[2 * L, float32]
@@ -398,9 +378,7 @@ when defined(simd):
       var ec = vmovq_n_f32(0.0'f32)
       let n = x.len
       var i = 0
-      while i + L <= n:
-        let xv = vld1q_f32(cast[pointer](unsafeAddr x[i]))
-        let yv = vld1q_f32(cast[pointer](unsafeAddr y[i]))
+      template dotK3Step(xv, yv: untyped) =
         let h = vmulq_f32(xv, yv)
         let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv, yv)
         let s2 = vaddq_f32(s, h)
@@ -416,6 +394,10 @@ when defined(simd):
         let er2 = vaddq_f32(vsubq_f32(es, vsubq_f32(es3, zr2)), vsubq_f32(r2, zr2))
         es = es3
         ec = vaddq_f32(ec, vaddq_f32(er1, er2))
+      while i + L <= n:
+        let xv = vld1q_f32(cast[pointer](unsafeAddr x[i]))
+        let yv = vld1q_f32(cast[pointer](unsafeAddr y[i]))
+        dotK3Step(xv, yv)
         i += L
       if i < n:
         var px: array[L, float32]
@@ -425,21 +407,7 @@ when defined(simd):
           px[k] = x[i]; py[k] = y[i]; inc i; inc k
         let xv = vld1q_f32(cast[pointer](addr px[0]))
         let yv = vld1q_f32(cast[pointer](addr py[0]))
-        let h = vmulq_f32(xv, yv)
-        let r1 = vfmaq_f32(vsubq_f32(vmovq_n_f32(0.0'f32), h), xv, yv)
-        let s2 = vaddq_f32(s, h)
-        let z = vsubq_f32(s2, s)
-        let r2 = vaddq_f32(vsubq_f32(s, vsubq_f32(s2, z)), vsubq_f32(h, z))
-        s = s2
-        let es2 = vaddq_f32(es, r1)
-        let zr1 = vsubq_f32(es2, es)
-        let er1 = vaddq_f32(vsubq_f32(es, vsubq_f32(es2, zr1)), vsubq_f32(r1, zr1))
-        es = es2
-        let es3 = vaddq_f32(es, r2)
-        let zr2 = vsubq_f32(es3, es)
-        let er2 = vaddq_f32(vsubq_f32(es, vsubq_f32(es3, zr2)), vsubq_f32(r2, zr2))
-        es = es3
-        ec = vaddq_f32(ec, vaddq_f32(er1, er2))
+        dotK3Step(xv, yv)
       # 3L separate addends, same reason as dot2SimdNeonF32.
       var vals: array[3 * L, float32]
       vst1q_f32(cast[pointer](addr vals[0]), s)
