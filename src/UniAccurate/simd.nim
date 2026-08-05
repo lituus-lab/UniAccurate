@@ -530,7 +530,13 @@ when defined(simd):
   func naiveDotSimd*[T: SomeFloat](x, y: openArray[T]): T {.contractual.} =
     ## SIMD naive dot (FMA reduce). Falls back to the scalar `naiveDot` off the
     ## SIMD ISAs. No reliability flag — the naive forward-error bound holds
-    ## regardless of lane concentration.
+    ## regardless of lane concentration. Finite inputs never yield NaN: an FMA
+    ## reduce can produce NaN from reordered opposite-sign `Inf` partials that
+    ## plain left-to-right scalar accumulation would not hit in the same
+    ## order (same order artifact, and same recovery, as `naiveSumSimd`); on
+    ## that rare overflow `naiveDot` reruns (and self-recovers via its own
+    ## `superDot` guard), so the result stays bit-identical to the
+    ## no-`-d:simd` build.
     require:
       x.len == y.len
     ensure:
@@ -543,6 +549,8 @@ when defined(simd):
       elif T is float32 and defined(arm64):
         result = naiveDotSimdNeonF32(x, y)
       else:
+        result = naiveDot(x, y)
+      if classify(result) == fcNan and allFin(x) and allFin(y):
         result = naiveDot(x, y)
 
   func dot2Simd*[T: SomeFloat](x, y: openArray[T]): SimdResult[
