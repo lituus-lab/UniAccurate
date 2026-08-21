@@ -50,6 +50,15 @@ template reductionSuite(T: typedesc) =
       check classify(centeredCosineSimilarity([large, large], [T(1), T(2)],
         large, T(1.5))) == fcNan
 
+    test "centered projection preserves representable extreme slopes":
+      let large = when T is float64: T(1e308) else: T(1e30)
+      check centeredProjectionCoefficient([large, T(0), -large],
+        [large, T(0), -large], T(0), T(0)) == T(1)
+      check centeredProjectionCoefficient([large, T(0), -large],
+        [-large, T(0), large], T(0), T(0)) == T(-1)
+      check classify(centeredProjectionCoefficient([large, large],
+        [T(1), T(2)], large, T(1.5))) == fcNan
+
     test "empty and non-finite inputs follow IEEE semantics":
       let empty: seq[T] = @[]
       check scaledEuclideanNorm(empty) == T(0)
