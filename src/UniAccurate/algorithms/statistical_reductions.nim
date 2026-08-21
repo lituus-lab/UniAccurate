@@ -5,6 +5,12 @@ import std/math
 import contracts
 import ./exactsum
 
+type
+  CenteredNormState*[T: SomeFloat] = object
+    ## Scale-separated representation of `sum((x - center)^2)`.
+    scale*: T
+    scaledSumSquares*: T
+
 func cLdexp(x: cdouble; exponent: cint): cdouble {.
     importc: "ldexp", header: "<math.h>".}
 func cLdexpf(x: cfloat; exponent: cint): cfloat {.
@@ -80,6 +86,32 @@ func centeredSumSquares*[T: SomeFloat](values: openArray[T]; center: T): T =
   for index, value in values:
     deviations[index] = value - center
   superDot(deviations, deviations)
+
+func centeredNormState*[T: SomeFloat](values: openArray[T]; center: T):
+    CenteredNormState[T] =
+  ## Builds a reusable centered norm without materialising `scale^2`.
+  let normalized = normalizedCentered(values, center)
+  result.scale = normalized.scale
+  if classify(result.scale) in {fcNan, fcInf}:
+    result.scaledSumSquares = T(NaN)
+  else:
+    result.scaledSumSquares = superDot(normalized.deviations,
+      normalized.deviations)
+
+func centeredSquaredRatio*[T: SomeFloat](state: CenteredNormState[T]; value,
+    center: T): T =
+  ## Evaluates `(value - center)^2 / sum((x - center)^2)` from a centered
+  ## norm state, avoiding overflow in both the deviation and denominator.
+  if state.scale == T(0) or state.scaledSumSquares <= T(0) or
+      classify(state.scale) in {fcNan, fcInf} or
+      classify(state.scaledSumSquares) in {fcNan, fcInf}:
+    return T(NaN)
+  let direct = value - center
+  let normalizedDeviation =
+    if classify(direct) notin {fcInf, fcNegInf}: direct / state.scale
+    else: value / state.scale - center / state.scale
+  let ratio = normalizedDeviation / sqrt(state.scaledSumSquares)
+  ratio * ratio
 
 func centeredCrossProduct*[T: SomeFloat](x, y: openArray[T]; centerX,
     centerY: T): T {.contractual.} =
