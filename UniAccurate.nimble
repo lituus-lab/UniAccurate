@@ -55,6 +55,10 @@ task oro, "ORO/Rump summation tests (debug, contracts active)":
 task dot, "Dot product tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_dot tests/test_dotproduct.nim"
 
+task statisticalReductions, "Statistical reduction tests":
+  exec "nim c -r --path:src -o:build/test_statistical_reductions" &
+       " tests/test_statistical_reductions.nim"
+
 task dispatch, "Runtime AVX2/AVX-512 dot dispatch tests (ADR-0008)":
   # -d:release, not debug: simd_dispatch.nim's {.raises: [].} on its scalar
   # fallback wrappers only holds once NimContracts' require/ensure on
@@ -76,6 +80,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nimble exact"
   exec "nimble oro"
   exec "nimble dot"
+  exec "nimble statisticalReductions"
   exec "nimble dispatch"
   exec "nimble expansions"
   exec "nimble prop"
@@ -89,6 +94,8 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_statistical_reductions_rel" &
+       " tests/test_statistical_reductions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dispatch_rel tests/test_simd_dispatch.nim"
   exec "nim c -r -d:release --path:src -o:build/test_expansions_rel tests/test_expansions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
@@ -101,6 +108,7 @@ task testCi, "Nim tests (CI subset, debug)":
   exec "nimble exact"
   exec "nimble oro"
   exec "nimble dot"
+  exec "nimble statisticalReductions"
   exec "nimble dispatch"
   exec "nimble expansions"
   exec "nimble prop"
@@ -114,6 +122,8 @@ task testCiRelease, "Nim tests (CI subset, release)":
   exec "nim c -r -d:release --path:src -o:build/test_exact_rel tests/test_exactsum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_oro_rel tests/test_orosum.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dot_rel tests/test_dotproduct.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_statistical_reductions_rel" &
+       " tests/test_statistical_reductions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_dispatch_rel tests/test_simd_dispatch.nim"
   exec "nim c -r -d:release --path:src -o:build/test_expansions_rel tests/test_expansions.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prop_rel tests/test_property.nim"
