@@ -26,6 +26,7 @@ from ._core import (
     _centered_sum_squares_c,
     _centered_cross_product_c,
     _centered_cosine_similarity_c,
+    _centered_projection_coefficient_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -213,6 +214,17 @@ def centered_cosine_similarity(xs, ys, center_x, center_y):
     return _centered_cosine_similarity_c(xs, ys, center_x, center_y)
 
 
+def centered_projection_coefficient(xs, ys, center_x, center_y):
+    """Range-safe centered least-squares projection coefficient."""
+    if isinstance(center_x, bool) or not isinstance(center_x, numbers.Real):
+        raise TypeError(
+            f"center_x must be a real number, got {type(center_x).__name__}")
+    if isinstance(center_y, bool) or not isinstance(center_y, numbers.Real):
+        raise TypeError(
+            f"center_y must be a real number, got {type(center_y).__name__}")
+    return _centered_projection_coefficient_c(xs, ys, center_x, center_y)
+
+
 def exact_dot(xs, ys):
     """Correctly-rounded dot product `sum(x_i * y_i)` (Neal small
     superaccumulator: 64x64->128 product accumulation, single final rounding).
@@ -267,6 +279,7 @@ __all__ = [
     "condition_number",
     "centered_cosine_similarity",
     "centered_cross_product",
+    "centered_projection_coefficient",
     "centered_sum_squares",
     "dot2",
     "dot_k",
