@@ -45,6 +45,8 @@ Python side.
   `nearSum`/`accSum`).
 - **Dot products** (`algorithms/dotproduct.nim`) — naive, compensated
   (`dot2`/`dotK3`), and a correctly-rounded `superDot`.
+- **Statistical reductions** (`algorithms/statistical_reductions.nim`) — scaled
+  Euclidean norm plus exact sums of represented centered products.
 - **SIMD kernels** (`simd.nim`) — AVX2/AVX-512 (amd64) and NEON (arm64)
   vectorized sum/dot, see ADR-0005 and ADR-0007. The direct Nim API and the
   sum family stay opt-in via `-d:simd`; the C ABI dot family (`ua_dot_naive`/

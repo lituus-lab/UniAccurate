@@ -68,4 +68,5 @@ Three tiers, each catching what the others cannot:
 
 ## Scope
 
-Hello-world scaffold: `fibonacci`, in Nim, C ABI, and Python. Apache-2.0, DCO.
+Numerical reduction engine: error-free transforms, accurate sums, dot products,
+and policy-free statistical reductions. Apache-2.0, DCO.

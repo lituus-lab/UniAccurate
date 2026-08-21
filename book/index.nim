@@ -351,6 +351,23 @@ nbCode:
   echo "cond (magnitude) = ", conditionNumber([1.0, 1e100, 1.0, -1e100])
 
 nbText: """
+## Statistical reductions
+
+`scaledEuclideanNorm` applies the BLAS LASSQ scaling recurrence: intermediate
+squares cannot overflow or underflow when the final norm is representable.
+`centeredSumSquares` and `centeredCrossProduct` subtract caller-supplied centers,
+then accumulate the represented products with the exact superaccumulator.
+Estimator conventions remain the responsibility of the statistical layer.
+"""
+
+nbCode:
+  let observations = [1e10, 1e10 + 1.0, 1e10 + 2.0]
+  echo "scaled norm 3-4 = ", scaledEuclideanNorm([3.0, 4.0])
+  echo "centered squares = ", centeredSumSquares(observations, 1e10 + 1.0)
+  echo "centered product = ", centeredCrossProduct(observations,
+    [2.0, 4.0, 6.0], 1e10 + 1.0, 4.0)
+
+nbText: """
 The C ABI exposes `ua_sum_oro` / `ua_sum_acc` / `ua_sum_near` / `ua_sum_k` /
 `ua_condition_number` and Python exposes `oro_sum` / `acc_sum` / `near_sum` /
 `sum_k` / `condition_number`.
