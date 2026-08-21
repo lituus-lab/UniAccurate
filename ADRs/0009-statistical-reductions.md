@@ -24,6 +24,11 @@ Centered projection coefficients combine normalized dot products and scale
 ratios through binary mantissas and exponents. A representable least-squares
 ratio therefore does not become `Inf / Inf` merely because both raw centered
 moments exceed the result type's range.
+`centeredNormState` retains the normalization scale and exact normalized
+sum-of-squares without materialising `scale²`. `centeredSquaredRatio` consumes
+that state for repeated regression leverage evaluation. This Nim substrate
+lets UniStatistics retain a safe fit without duplicating arithmetic; C and
+Python consumers reach the operation through UniStatistics regression APIs.
 
 ## Consequences
 
