@@ -355,6 +355,11 @@ nbText: """
 
 `scaledEuclideanNorm` applies the BLAS LASSQ scaling recurrence: intermediate
 squares cannot overflow or underflow when the final norm is representable.
+`scaledMean` uses the exact rounded total when representable and exactly
+accumulates represented `x[i] / n` quotients only as an overflow fallback. It
+does not claim correctly rounded rational division of the exact sum.
+`centeredCosineSimilarity` normalizes deviations
+before its exact dot product, keeping correlation-like results representable.
 `centeredSumSquares` and `centeredCrossProduct` subtract caller-supplied centers,
 then accumulate the represented products with the exact superaccumulator.
 Estimator conventions remain the responsibility of the statistical layer.
@@ -362,10 +367,13 @@ Estimator conventions remain the responsibility of the statistical layer.
 
 nbCode:
   let observations = [1e10, 1e10 + 1.0, 1e10 + 2.0]
+  echo "scaled mean max = ", scaledMean([1e308, 1e308])
   echo "scaled norm 3-4 = ", scaledEuclideanNorm([3.0, 4.0])
   echo "centered squares = ", centeredSumSquares(observations, 1e10 + 1.0)
   echo "centered product = ", centeredCrossProduct(observations,
     [2.0, 4.0, 6.0], 1e10 + 1.0, 4.0)
+  echo "centered cosine = ", centeredCosineSimilarity(
+    [1e308, -1e308], [1e308, -1e308], 0.0, 0.0)
 
 nbText: """
 The C ABI exposes `ua_sum_oro` / `ua_sum_acc` / `ua_sum_near` / `ua_sum_k` /
