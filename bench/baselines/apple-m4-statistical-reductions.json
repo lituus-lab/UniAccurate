@@ -13,35 +13,42 @@
   "norm_semantics": "allocation-free scaled recurrence",
   "centered_semantics": "deviation allocation plus exact superaccumulator",
   "cosine_semantics": "normalized deviations plus exact dot and scaled norms",
+  "projection_semantics": "normalized centered projection with binary scale ratio",
   "mean_run_mean_ms": [
-    0.36615835,
-    0.35640615000000003,
-    0.36353745
+    0.36627094999999993,
+    0.3542687500000001,
+    0.35598749999999996
   ],
   "norm_run_mean_ms": [
-    0.4201104,
-    0.40622715,
-    0.4038041
+    0.42531260000000004,
+    0.4355897,
+    0.44889795000000005
   ],
   "centered_squares_run_mean_ms": [
-    0.5738145499999999,
-    0.54974985,
-    0.55109785
+    0.5798604999999999,
+    0.5562604,
+    0.54870015
   ],
   "centered_cross_run_mean_ms": [
-    0.5995248499999999,
-    0.5755958999999999,
-    0.5817335
+    0.5867103499999999,
+    0.5777062,
+    0.5798020500000002
   ],
   "centered_cosine_run_mean_ms": [
-    1.9271063499999996,
-    1.86246875,
-    1.8817062000000002
+    2.02626865,
+    1.9577313,
+    1.9636291
   ],
-  "mean_median_ms": 0.36353745,
-  "norm_median_ms": 0.40622715,
-  "centered_squares_median_ms": 0.55109785,
-  "centered_cross_median_ms": 0.5817335,
-  "centered_cosine_median_ms": 1.8817062000000002,
-  "guard": 219481111369064.66
+  "centered_projection_run_mean_ms": [
+    1.7669416999999998,
+    1.6976708999999999,
+    1.7029314000000002
+  ],
+  "mean_median_ms": 0.35598749999999996,
+  "norm_median_ms": 0.4355897,
+  "centered_squares_median_ms": 0.5562604,
+  "centered_cross_median_ms": 0.5798020500000002,
+  "centered_cosine_median_ms": 1.9636291,
+  "centered_projection_median_ms": 1.7029314000000002,
+  "guard": 219481111369064.12
 }
