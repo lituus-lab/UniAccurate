@@ -48,9 +48,13 @@ cdef extern from "UniAccurate.h":
     double ua_sum_k(const double *x, size_t n, int k)
     double ua_condition_number(const double *x, size_t n)
     double ua_norm_scaled(const double *x, size_t n)
+    double ua_mean_scaled(const double *x, size_t n)
     double ua_centered_sum_squares(const double *x, size_t n, double center)
     double ua_centered_cross_product(const double *x, const double *y,
                                      size_t n, double center_x, double center_y)
+    double ua_centered_cosine_similarity(const double *x, const double *y,
+                                         size_t n, double center_x,
+                                         double center_y)
 
 
 def two_sum(double a, double b):
@@ -167,6 +171,12 @@ def _condition_number_c(values):
 
 def _scaled_norm_c(values):
     return _sum_generic(values, ua_norm_scaled)
+
+
+def _scaled_mean_c(values):
+    if len(values) == 0:
+        raise ValueError("mean requires at least one value")
+    return _sum_generic(values, ua_mean_scaled)
 
 
 cdef _centered_sum_generic(values, double center):
@@ -336,6 +346,48 @@ cdef _centered_dot_generic(xs, ys, double center_x, double center_y):
 
 def _centered_cross_product_c(xs, ys, double center_x, double center_y):
     return _centered_dot_generic(xs, ys, center_x, center_y)
+
+
+def _centered_cosine_similarity_c(xs, ys, double center_x, double center_y):
+    cdef const double[::1] vx, vy
+    try:
+        vx = xs
+        vy = ys
+    except (TypeError, ValueError, BufferError):
+        pass
+    else:
+        if vx.shape[0] != vy.shape[0]:
+            raise ValueError("centered similarity requires equal-length inputs")
+        if vx.shape[0] == 0:
+            raise ValueError("centered similarity requires non-empty inputs")
+        return ua_centered_cosine_similarity(&vx[0], &vy[0],
+            <size_t>vx.shape[0], center_x, center_y)
+    cdef Py_ssize_t n = _checked_len(len(xs))
+    if len(ys) != n:
+        raise ValueError("centered similarity requires equal-length inputs")
+    if n == 0:
+        raise ValueError("centered similarity requires non-empty inputs")
+    cdef double *bx = <double *>malloc(n * sizeof(double))
+    cdef double *by = <double *>malloc(n * sizeof(double))
+    if bx == NULL or by == NULL:
+        free(bx); free(by)
+        raise MemoryError()
+    cdef Py_ssize_t i
+    cdef object v
+    try:
+        for i in range(n):
+            v = xs[i]
+            if not _is_real_number(v):
+                raise TypeError(f"elements must be numbers, got {type(v).__name__}")
+            bx[i] = v
+            v = ys[i]
+            if not _is_real_number(v):
+                raise TypeError(f"elements must be numbers, got {type(v).__name__}")
+            by[i] = v
+        return ua_centered_cosine_similarity(
+            bx, by, <size_t>n, center_x, center_y)
+    finally:
+        free(bx); free(by)
 
 
 cdef _dot_k_generic(xs, ys, int k,

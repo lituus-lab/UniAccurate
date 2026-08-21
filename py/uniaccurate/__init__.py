@@ -22,8 +22,10 @@ from ._core import (
     _dot2_c,
     _dot_k_c,
     _scaled_norm_c,
+    _scaled_mean_c,
     _centered_sum_squares_c,
     _centered_cross_product_c,
+    _centered_cosine_similarity_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -177,6 +179,11 @@ def scaled_norm(values):
     return _scaled_norm_c(values)
 
 
+def scaled_mean(values):
+    """Mean whose scaled quotient reduction cannot overflow its finite range."""
+    return _scaled_mean_c(values)
+
+
 def centered_sum_squares(values, center):
     """Correctly rounded sum of represented deviations squared."""
     if isinstance(center, bool) or not isinstance(center, numbers.Real):
@@ -193,6 +200,17 @@ def centered_cross_product(xs, ys, center_x, center_y):
         raise TypeError(
             f"center_y must be a real number, got {type(center_y).__name__}")
     return _centered_cross_product_c(xs, ys, center_x, center_y)
+
+
+def centered_cosine_similarity(xs, ys, center_x, center_y):
+    """Cosine similarity of centered vectors with range-safe normalization."""
+    if isinstance(center_x, bool) or not isinstance(center_x, numbers.Real):
+        raise TypeError(
+            f"center_x must be a real number, got {type(center_x).__name__}")
+    if isinstance(center_y, bool) or not isinstance(center_y, numbers.Real):
+        raise TypeError(
+            f"center_y must be a real number, got {type(center_y).__name__}")
+    return _centered_cosine_similarity_c(xs, ys, center_x, center_y)
 
 
 def exact_dot(xs, ys):
@@ -247,6 +265,7 @@ __all__ = [
     "__version__",
     "acc_sum",
     "condition_number",
+    "centered_cosine_similarity",
     "centered_cross_product",
     "centered_sum_squares",
     "dot2",
@@ -263,6 +282,7 @@ __all__ = [
     "pairwise_sum",
     "pairwise_sum_iterative",
     "shewchuk_sum",
+    "scaled_mean",
     "scaled_norm",
     "sum_k",
     "two_sum",
