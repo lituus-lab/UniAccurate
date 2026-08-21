@@ -55,6 +55,9 @@ cdef extern from "UniAccurate.h":
     double ua_centered_cosine_similarity(const double *x, const double *y,
                                          size_t n, double center_x,
                                          double center_y)
+    double ua_centered_projection_coefficient(const double *x, const double *y,
+                                              size_t n, double center_x,
+                                              double center_y)
 
 
 def two_sum(double a, double b):
@@ -303,7 +306,9 @@ def _dot2_c(xs, ys):
     return _dot_generic(xs, ys, ua_dot2)
 
 
-cdef _centered_dot_generic(xs, ys, double center_x, double center_y):
+cdef _centered_dot_generic(xs, ys, double center_x, double center_y,
+                           double (*fn)(const double *, const double *, size_t,
+                                        double, double)):
     cdef const double[::1] vx, vy
     try:
         vx = xs
@@ -315,8 +320,7 @@ cdef _centered_dot_generic(xs, ys, double center_x, double center_y):
             raise ValueError("centered product requires equal-length inputs")
         if vx.shape[0] == 0:
             return 0.0
-        return ua_centered_cross_product(&vx[0], &vy[0],
-            <size_t>vx.shape[0], center_x, center_y)
+        return fn(&vx[0], &vy[0], <size_t>vx.shape[0], center_x, center_y)
     cdef Py_ssize_t n = _checked_len(len(xs))
     if len(ys) != n:
         raise ValueError("centered product requires equal-length inputs")
@@ -339,13 +343,21 @@ cdef _centered_dot_generic(xs, ys, double center_x, double center_y):
             if not _is_real_number(v):
                 raise TypeError(f"elements must be numbers, got {type(v).__name__}")
             by[i] = v
-        return ua_centered_cross_product(bx, by, <size_t>n, center_x, center_y)
+        return fn(bx, by, <size_t>n, center_x, center_y)
     finally:
         free(bx); free(by)
 
 
 def _centered_cross_product_c(xs, ys, double center_x, double center_y):
-    return _centered_dot_generic(xs, ys, center_x, center_y)
+    return _centered_dot_generic(
+        xs, ys, center_x, center_y, ua_centered_cross_product)
+
+
+def _centered_projection_coefficient_c(xs, ys, double center_x, double center_y):
+    if len(xs) == 0:
+        raise ValueError("centered projection requires non-empty inputs")
+    return _centered_dot_generic(
+        xs, ys, center_x, center_y, ua_centered_projection_coefficient)
 
 
 def _centered_cosine_similarity_c(xs, ys, double center_x, double center_y):
