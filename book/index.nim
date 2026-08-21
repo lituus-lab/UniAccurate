@@ -360,6 +360,8 @@ accumulates represented `x[i] / n` quotients only as an overflow fallback. It
 does not claim correctly rounded rational division of the exact sum.
 `centeredCosineSimilarity` normalizes deviations
 before its exact dot product, keeping correlation-like results representable.
+`centeredProjectionCoefficient` additionally combines binary scale exponents,
+so a least-squares slope remains representable when both raw moments overflow.
 `centeredSumSquares` and `centeredCrossProduct` subtract caller-supplied centers,
 then accumulate the represented products with the exact superaccumulator.
 Estimator conventions remain the responsibility of the statistical layer.
@@ -374,6 +376,8 @@ nbCode:
     [2.0, 4.0, 6.0], 1e10 + 1.0, 4.0)
   echo "centered cosine = ", centeredCosineSimilarity(
     [1e308, -1e308], [1e308, -1e308], 0.0, 0.0)
+  echo "projection = ", centeredProjectionCoefficient(
+    [1e308, 0.0, -1e308], [1e308, 0.0, -1e308], 0.0, 0.0)
 
 nbText: """
 The C ABI exposes `ua_sum_oro` / `ua_sum_acc` / `ua_sum_near` / `ua_sum_k` /
