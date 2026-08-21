@@ -31,6 +31,8 @@ def test_centered_products_support_lists_and_buffers():
         values, [2.0, 4.0, 6.0], 1e10 + 1.0, 4.0) == 4.0
     assert uniaccurate.centered_cosine_similarity(
         [1e308, -1e308], [1e308, -1e308], 0.0, 0.0) == pytest.approx(1.0)
+    assert uniaccurate.centered_projection_coefficient(
+        [1e308, 0.0, -1e308], [1e308, 0.0, -1e308], 0.0, 0.0) == 1.0
 
 
 def test_centered_products_validate_inputs():
@@ -44,3 +46,5 @@ def test_centered_products_validate_inputs():
         uniaccurate.centered_cross_product([1.0], [1.0], 0.0, None)
     with pytest.raises(ValueError):
         uniaccurate.centered_cosine_similarity([], [], 0.0, 0.0)
+    with pytest.raises(ValueError):
+        uniaccurate.centered_projection_coefficient([], [], 0.0, 0.0)
