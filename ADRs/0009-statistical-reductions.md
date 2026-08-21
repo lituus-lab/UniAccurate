@@ -20,6 +20,10 @@ range of the observations. It deliberately does not promise correctly rounded
 rational division of the exact sum. Centered cosine similarity normalizes
 deviations before its exact dot product, so correlation consumers do not form
 overflowing sums of squares.
+Centered projection coefficients combine normalized dot products and scale
+ratios through binary mantissas and exponents. A representable least-squares
+ratio therefore does not become `Inf / Inf` merely because both raw centered
+moments exceed the result type's range.
 
 ## Consequences
 
