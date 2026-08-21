@@ -197,6 +197,19 @@ int main(void) {
     if (c > 1e19) printf("ok   cond cancel = %g (> 1e19)\n", c);
     else { printf("FAIL cond cancel: got %g want > 1e19\n", c); failures++; } }
 
+  sum_call("scaled norm 3-4", ua_norm_scaled,
+           (double[]){3.0, 4.0}, 2, 5.0);
+  sum_call("scaled norm empty", ua_norm_scaled, NULL, 0, 0.0);
+  { double centered[] = {1e10, 1e10 + 1.0, 1e10 + 2.0};
+    double paired_centered[] = {2.0, 4.0, 6.0};
+    double ss = ua_centered_sum_squares(centered, 3, 1e10 + 1.0);
+    double cp = ua_centered_cross_product(centered, paired_centered, 3,
+                                          1e10 + 1.0, 4.0);
+    if (ss != 2.0 || cp != 4.0) {
+      printf("FAIL centered reductions: got (%g, %g) want (2, 4)\n", ss, cp);
+      failures++;
+    } else printf("ok   centered reductions = (2, 4)\n"); }
+
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
   return 1;
