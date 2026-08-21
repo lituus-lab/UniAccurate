@@ -8,6 +8,6 @@ include deviation-buffer allocation and the exact superaccumulator.
 Set `UNIACCURATE_BENCHMARK_MACHINE` when producing a versioned machine baseline.
 The numbers detect local regressions and are not portable speedup claims.
 
-On the recorded Apple M4, 100,000 values take median means of 0.4062 ms for
-scaled norm, 0.5511 ms for centered squares, and 0.5817 ms for centered cross
+On the recorded Apple M4, 100,000 values take median means of 0.4356 ms for
+scaled norm, 0.5563 ms for centered squares, and 0.5798 ms for centered cross
 product.
