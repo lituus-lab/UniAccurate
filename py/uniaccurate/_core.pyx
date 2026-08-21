@@ -47,6 +47,10 @@ cdef extern from "UniAccurate.h":
     double ua_sum_acc(const double *x, size_t n)
     double ua_sum_k(const double *x, size_t n, int k)
     double ua_condition_number(const double *x, size_t n)
+    double ua_norm_scaled(const double *x, size_t n)
+    double ua_centered_sum_squares(const double *x, size_t n, double center)
+    double ua_centered_cross_product(const double *x, const double *y,
+                                     size_t n, double center_x, double center_y)
 
 
 def two_sum(double a, double b):
@@ -161,6 +165,43 @@ def _condition_number_c(values):
     return _sum_generic(values, ua_condition_number)
 
 
+def _scaled_norm_c(values):
+    return _sum_generic(values, ua_norm_scaled)
+
+
+cdef _centered_sum_generic(values, double center):
+    cdef const double[::1] view
+    try:
+        view = values
+    except (TypeError, ValueError, BufferError):
+        pass
+    else:
+        if view.shape[0] == 0:
+            return 0.0
+        return ua_centered_sum_squares(&view[0], <size_t>view.shape[0], center)
+    cdef Py_ssize_t n = _checked_len(len(values))
+    if n == 0:
+        return 0.0
+    cdef double *buf = <double *>malloc(n * sizeof(double))
+    if buf == NULL:
+        raise MemoryError()
+    cdef Py_ssize_t i
+    cdef object v
+    try:
+        for i in range(n):
+            v = values[i]
+            if not _is_real_number(v):
+                raise TypeError(f"elements must be numbers, got {type(v).__name__}")
+            buf[i] = v
+        return ua_centered_sum_squares(buf, <size_t>n, center)
+    finally:
+        free(buf)
+
+
+def _centered_sum_squares_c(values, double center):
+    return _centered_sum_generic(values, center)
+
+
 cdef _sum_k_generic(values, int k, double (*fn)(const double *, size_t, int)):
     cdef const double[::1] view
     try:
@@ -250,6 +291,51 @@ def _dot_naive_c(xs, ys):
 def _dot2_c(xs, ys):
     """Twice-precision compensated dot (ORO Alg 5.3, K=2) of `xs`·`ys`."""
     return _dot_generic(xs, ys, ua_dot2)
+
+
+cdef _centered_dot_generic(xs, ys, double center_x, double center_y):
+    cdef const double[::1] vx, vy
+    try:
+        vx = xs
+        vy = ys
+    except (TypeError, ValueError, BufferError):
+        pass
+    else:
+        if vx.shape[0] != vy.shape[0]:
+            raise ValueError("centered product requires equal-length inputs")
+        if vx.shape[0] == 0:
+            return 0.0
+        return ua_centered_cross_product(&vx[0], &vy[0],
+            <size_t>vx.shape[0], center_x, center_y)
+    cdef Py_ssize_t n = _checked_len(len(xs))
+    if len(ys) != n:
+        raise ValueError("centered product requires equal-length inputs")
+    if n == 0:
+        return 0.0
+    cdef double *bx = <double *>malloc(n * sizeof(double))
+    cdef double *by = <double *>malloc(n * sizeof(double))
+    if bx == NULL or by == NULL:
+        free(bx); free(by)
+        raise MemoryError()
+    cdef Py_ssize_t i
+    cdef object v
+    try:
+        for i in range(n):
+            v = xs[i]
+            if not _is_real_number(v):
+                raise TypeError(f"elements must be numbers, got {type(v).__name__}")
+            bx[i] = v
+            v = ys[i]
+            if not _is_real_number(v):
+                raise TypeError(f"elements must be numbers, got {type(v).__name__}")
+            by[i] = v
+        return ua_centered_cross_product(bx, by, <size_t>n, center_x, center_y)
+    finally:
+        free(bx); free(by)
+
+
+def _centered_cross_product_c(xs, ys, double center_x, double center_y):
+    return _centered_dot_generic(xs, ys, center_x, center_y)
 
 
 cdef _dot_k_generic(xs, ys, int k,

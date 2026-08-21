@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 """uniaccurate — Python binding over the UniAccurate C library."""
+import numbers
 from ._core import two_sum as _two_sum_c, version as _version_c
 from ._core import (
     _sum_naive_c,
@@ -20,6 +21,9 @@ from ._core import (
     _dot_naive_c,
     _dot2_c,
     _dot_k_c,
+    _scaled_norm_c,
+    _centered_sum_squares_c,
+    _centered_cross_product_c,
 )
 
 __version__ = _version_c().decode("ascii")
@@ -168,6 +172,29 @@ def condition_number(values):
     return _condition_number_c(values)
 
 
+def scaled_norm(values):
+    """Euclidean norm with scaled squares, preserving representable extremes."""
+    return _scaled_norm_c(values)
+
+
+def centered_sum_squares(values, center):
+    """Correctly rounded sum of represented deviations squared."""
+    if isinstance(center, bool) or not isinstance(center, numbers.Real):
+        raise TypeError(f"center must be a real number, got {type(center).__name__}")
+    return _centered_sum_squares_c(values, center)
+
+
+def centered_cross_product(xs, ys, center_x, center_y):
+    """Correctly rounded sum of represented centered pair products."""
+    if isinstance(center_x, bool) or not isinstance(center_x, numbers.Real):
+        raise TypeError(
+            f"center_x must be a real number, got {type(center_x).__name__}")
+    if isinstance(center_y, bool) or not isinstance(center_y, numbers.Real):
+        raise TypeError(
+            f"center_y must be a real number, got {type(center_y).__name__}")
+    return _centered_cross_product_c(xs, ys, center_x, center_y)
+
+
 def exact_dot(xs, ys):
     """Correctly-rounded dot product `sum(x_i * y_i)` (Neal small
     superaccumulator: 64x64->128 product accumulation, single final rounding).
@@ -220,6 +247,8 @@ __all__ = [
     "__version__",
     "acc_sum",
     "condition_number",
+    "centered_cross_product",
+    "centered_sum_squares",
     "dot2",
     "dot_k",
     "exact_dot",
@@ -234,6 +263,7 @@ __all__ = [
     "pairwise_sum",
     "pairwise_sum_iterative",
     "shewchuk_sum",
+    "scaled_norm",
     "sum_k",
     "two_sum",
     "version",
