@@ -10,6 +10,7 @@ import UniAccurate/algorithms/exactsum
 import UniAccurate/algorithms/orosum
 import UniAccurate/algorithms/dotproduct
 import UniAccurate/algorithms/expansions
+import UniAccurate/algorithms/statistical_reductions
 export twosum
 export naivesum
 export pairwisesum
@@ -19,6 +20,7 @@ export exactsum
 export orosum
 export dotproduct
 export expansions
+export statistical_reductions
 when defined(simd):
   import UniAccurate/simd
   export simd
