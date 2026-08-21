@@ -139,6 +139,11 @@ task example, "Nim demo":
 task bench, "Quick scalar bench smoke (release, reduced sizes) -- not the AVX-512 reference numbers":
   exec "nim c -r -d:release --path:src -o:build/bench_driver bench/driver_nim.nim quick ci"
 
+task benchStatisticalReductions, "Three-run statistical reduction baseline":
+  exec "nim c -r -d:release --mm:orc --path:src" &
+       " -o:build/bench_statistical_reductions" &
+       " bench/bench_statistical_reductions.nim"
+
 # Nim takes `-o:` literally and appends no platform extension.
 const
   sharedLib =
