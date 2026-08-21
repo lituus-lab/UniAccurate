@@ -338,4 +338,17 @@ proc ua_centered_cosine_similarity(x, y: ptr cdouble; n: csize_t; centerX,
   except ValueError:
     NaN
 
+proc ua_centered_projection_coefficient(x, y: ptr cdouble; n: csize_t; centerX,
+    centerY: cdouble): cdouble {.raises: [].} =
+  if n == 0:
+    return NaN
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  try:
+    centeredProjectionCoefficient(toOpenArray(ax, 0, last),
+      toOpenArray(ay, 0, last), centerX, centerY)
+  except ValueError:
+    NaN
+
 {.pop.}
