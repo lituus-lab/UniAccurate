@@ -36,25 +36,35 @@ proc main() =
     y[index] = -1e8 + (index mod 509).float64 * 0.5
   let centerX = 1e10 + 510.0
   let centerY = -1e8 + 127.0
-  var normRuns, squaresRuns, crossRuns: seq[float64]
+  var meanRuns, normRuns, squaresRuns, crossRuns, cosineRuns: seq[float64]
   var guard: float64
   for _ in 0 ..< Runs:
     for _ in 0 ..< Warmups:
+      guard += scaledMean(x)
       guard += scaledEuclideanNorm(x)
       guard += centeredSumSquares(x, centerX)
       guard += centeredCrossProduct(x, y, centerX, centerY)
-    var normSamples, squaresSamples, crossSamples: seq[float64]
+      guard += centeredCosineSimilarity(x, y, centerX, centerY)
+    var meanSamples, normSamples, squaresSamples, crossSamples,
+      cosineSamples: seq[float64]
     for _ in 0 ..< Iterations:
+      let meanElapsed = elapsed: guard += scaledMean(x)
       let normElapsed = elapsed: guard += scaledEuclideanNorm(x)
       let squaresElapsed = elapsed: guard += centeredSumSquares(x, centerX)
       let crossElapsed = elapsed:
         guard += centeredCrossProduct(x, y, centerX, centerY)
+      let cosineElapsed = elapsed:
+        guard += centeredCosineSimilarity(x, y, centerX, centerY)
+      meanSamples.add meanElapsed
       normSamples.add normElapsed
       squaresSamples.add squaresElapsed
       crossSamples.add crossElapsed
+      cosineSamples.add cosineElapsed
+    meanRuns.add average(meanSamples)
     normRuns.add average(normSamples)
     squaresRuns.add average(squaresSamples)
     crossRuns.add average(crossSamples)
+    cosineRuns.add average(cosineSamples)
   let report = %*{
     "provider": "UniAccurate",
     "version": UniAccurateVersion,
@@ -66,14 +76,20 @@ proc main() =
     "warmups_per_run": Warmups,
     "iterations_per_run": Iterations,
     "runs": Runs,
+    "mean_semantics": "exact total with quotient-scaled overflow fallback",
     "norm_semantics": "allocation-free scaled recurrence",
     "centered_semantics": "deviation allocation plus exact superaccumulator",
+    "cosine_semantics": "normalized deviations plus exact dot and scaled norms",
+    "mean_run_mean_ms": meanRuns,
     "norm_run_mean_ms": normRuns,
     "centered_squares_run_mean_ms": squaresRuns,
     "centered_cross_run_mean_ms": crossRuns,
+    "centered_cosine_run_mean_ms": cosineRuns,
+    "mean_median_ms": median(meanRuns),
     "norm_median_ms": median(normRuns),
     "centered_squares_median_ms": median(squaresRuns),
     "centered_cross_median_ms": median(crossRuns),
+    "centered_cosine_median_ms": median(cosineRuns),
     "guard": guard
   }
   createDir(parentDir(output))
