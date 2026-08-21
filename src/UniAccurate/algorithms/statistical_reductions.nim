@@ -5,6 +5,32 @@ import std/math
 import contracts
 import ./exactsum
 
+func cLdexp(x: cdouble; exponent: cint): cdouble {.
+    importc: "ldexp", header: "<math.h>".}
+func cLdexpf(x: cfloat; exponent: cint): cfloat {.
+    importc: "ldexpf", header: "<math.h>".}
+
+func scalePowerOfTwo[T: SomeFloat](value: T; exponent: int): T {.inline.} =
+  when T is float64:
+    T(cLdexp(cdouble(value), cint(exponent)))
+  else:
+    T(cLdexpf(cfloat(value), cint(exponent)))
+
+func normalizedCentered[T: SomeFloat](values: openArray[T]; center: T):
+    tuple[scale: T; deviations: seq[T]] =
+  for value in values:
+    result.scale = max(result.scale, max(abs(value), abs(center)))
+  if classify(result.scale) in {fcNan, fcInf}:
+    return
+  result.deviations = newSeq[T](values.len)
+  if result.scale == T(0):
+    return
+  for index, value in values:
+    let deviation = value - center
+    result.deviations[index] =
+      if classify(deviation) notin {fcInf, fcNegInf}: deviation / result.scale
+      else: value / result.scale - center / result.scale
+
 func scaledMean*[T: SomeFloat](values: openArray[T]): T {.contractual.} =
   ## Exact-total mean when the sum is representable, with a quotient-scaled
   ## fallback when finite inputs overflow that intermediate sum.
@@ -78,31 +104,51 @@ func centeredCosineSimilarity*[T: SomeFloat](x, y: openArray[T]; centerX,
     if x.len != y.len or x.len == 0:
       raise newException(ValueError,
         "centered vectors must have equal non-zero lengths")
-    var scaleX, scaleY = T(0)
-    for index in 0 ..< x.len:
-      scaleX = max(scaleX, max(abs(x[index]), abs(centerX)))
-      scaleY = max(scaleY, max(abs(y[index]), abs(centerY)))
-    if classify(scaleX) == fcNan or classify(scaleY) == fcNan:
-      return T(NaN)
-    if classify(scaleX) == fcInf or classify(scaleY) == fcInf:
-      return T(NaN)
-    var normalizedX = newSeq[T](x.len)
-    var normalizedY = newSeq[T](y.len)
-    for index in 0 ..< x.len:
-      if scaleX != T(0):
-        let deviation = x[index] - centerX
-        normalizedX[index] =
-          if classify(deviation) notin {fcInf, fcNegInf}: deviation / scaleX
-          else: x[index] / scaleX - centerX / scaleX
-      if scaleY != T(0):
-        let deviation = y[index] - centerY
-        normalizedY[index] =
-          if classify(deviation) notin {fcInf, fcNegInf}: deviation / scaleY
-          else: y[index] / scaleY - centerY / scaleY
     let
-      normX = scaledEuclideanNorm(normalizedX)
-      normY = scaledEuclideanNorm(normalizedY)
+      normalizedX = normalizedCentered(x, centerX)
+      normalizedY = normalizedCentered(y, centerY)
+    if classify(normalizedX.scale) in {fcNan, fcInf} or
+        classify(normalizedY.scale) in {fcNan, fcInf}:
+      return T(NaN)
+    let
+      normX = scaledEuclideanNorm(normalizedX.deviations)
+      normY = scaledEuclideanNorm(normalizedY.deviations)
     if normX == T(0) or normY == T(0):
       return T(NaN)
-    let similarity = (superDot(normalizedX, normalizedY) / normX) / normY
+    let similarity = (superDot(normalizedX.deviations,
+      normalizedY.deviations) / normX) / normY
     max(T(-1), min(T(1), similarity))
+
+func centeredProjectionCoefficient*[T: SomeFloat](x, y: openArray[T]; centerX,
+    centerY: T): T {.contractual.} =
+  ## Range-safe `sum(dx*dy) / sum(dx*dx)` for a centered projection.
+  require:
+    x.len == y.len
+    x.len > 0
+  body:
+    if x.len != y.len or x.len == 0:
+      raise newException(ValueError,
+        "centered vectors must have equal non-zero lengths")
+    let
+      normalizedX = normalizedCentered(x, centerX)
+      normalizedY = normalizedCentered(y, centerY)
+    if classify(normalizedX.scale) in {fcNan, fcInf} or
+        classify(normalizedY.scale) in {fcNan, fcInf}:
+      return T(NaN)
+    let
+      numerator = superDot(normalizedX.deviations, normalizedY.deviations)
+      denominator = superDot(normalizedX.deviations, normalizedX.deviations)
+    if denominator == T(0):
+      return T(NaN)
+    if numerator == T(0):
+      return T(0)
+    let
+      numeratorParts = frexp(numerator)
+      denominatorParts = frexp(denominator)
+      scaleYParts = frexp(normalizedY.scale)
+      scaleXParts = frexp(normalizedX.scale)
+      mantissa = (numeratorParts.frac * scaleYParts.frac) /
+        (denominatorParts.frac * scaleXParts.frac)
+      exponent = numeratorParts.exp + scaleYParts.exp - denominatorParts.exp -
+        scaleXParts.exp
+    scalePowerOfTwo(mantissa, exponent)
