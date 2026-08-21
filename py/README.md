@@ -30,6 +30,7 @@ s, e = uniaccurate.two_sum(1.0, 2e16)                # (2e16, 1.0) -- error reco
 uniaccurate.kahan_sum([0.1] * 10)                    # 1.0
 uniaccurate.shewchuk_sum([1.0, 1e100, 1.0, -1e100])  # 2.0, correctly rounded
 uniaccurate.exact_dot([1.0, 2.0], [3.0, 4.0])        # 11.0, correctly rounded
+uniaccurate.scaled_norm([3.0, 4.0])                   # 5.0
 ```
 
 ## What's included
@@ -42,6 +43,7 @@ uniaccurate.exact_dot([1.0, 2.0], [3.0, 4.0])        # 11.0, correctly rounded
 | Correctly-rounded summation | `shewchuk_sum`, `exact_sum`, `oro_sum`, `acc_sum`, `near_sum` |
 | Dot product | `naive_dot`, `dot2`, `dot_k`, `exact_dot` |
 | Diagnostics | `condition_number` |
+| Statistical reductions | `scaled_norm`, `centered_sum_squares`, `centered_cross_product` |
 
 Every function raises `TypeError` on non-numeric input rather than silently
 coercing; see each docstring (`help(uniaccurate.kahan_sum)`) for the exact
