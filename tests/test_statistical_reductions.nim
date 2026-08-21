@@ -40,6 +40,17 @@ template reductionSuite(T: typedesc) =
       check centeredCrossProduct(values, [T(2), T(4), T(6)],
         base + T(1), T(4)) == T(4)
 
+    test "centered norm state preserves extreme leverage":
+      let large = when T is float64: T(1e308) else: T(1e30)
+      let state = centeredNormState([large, T(0), -large], T(0))
+      check state.scale == large
+      check abs(state.scaledSumSquares - T(2)) <=
+        (when T is float64: T(1e-15) else: T(1e-6))
+      check abs(centeredSquaredRatio(state, large, T(0)) - T(0.5)) <=
+        (when T is float64: T(1e-15) else: T(1e-6))
+      check classify(centeredSquaredRatio(
+        centeredNormState([T(1), T(1)], T(1)), T(1), T(1))) == fcNan
+
     test "centered cosine avoids overflowing sums of squares":
       let large = when T is float64: T(1e308) else: T(1e30)
       let tolerance = when T is float64: T(2e-15) else: T(2e-6)
