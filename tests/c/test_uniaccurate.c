@@ -200,15 +200,22 @@ int main(void) {
   sum_call("scaled norm 3-4", ua_norm_scaled,
            (double[]){3.0, 4.0}, 2, 5.0);
   sum_call("scaled norm empty", ua_norm_scaled, NULL, 0, 0.0);
+  sum_call("scaled mean extreme", ua_mean_scaled,
+           (double[]){1e308, 1e308}, 2, 1e308);
+  if (!isnan(ua_mean_scaled(NULL, 0))) {
+    printf("FAIL scaled mean empty: expected NaN\n"); failures++;
+  }
   { double centered[] = {1e10, 1e10 + 1.0, 1e10 + 2.0};
     double paired_centered[] = {2.0, 4.0, 6.0};
     double ss = ua_centered_sum_squares(centered, 3, 1e10 + 1.0);
     double cp = ua_centered_cross_product(centered, paired_centered, 3,
                                           1e10 + 1.0, 4.0);
-    if (ss != 2.0 || cp != 4.0) {
-      printf("FAIL centered reductions: got (%g, %g) want (2, 4)\n", ss, cp);
+    double cosine = ua_centered_cosine_similarity(
+      (double[]){1e308, -1e308}, (double[]){1e308, -1e308}, 2, 0.0, 0.0);
+    if (ss != 2.0 || cp != 4.0 || fabs(cosine - 1.0) > 2e-15) {
+      printf("FAIL centered reductions: got (%g, %g, %g)\n", ss, cp, cosine);
       failures++;
-    } else printf("ok   centered reductions = (2, 4)\n"); }
+    } else printf("ok   centered reductions = (2, 4, 1)\n"); }
 
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
