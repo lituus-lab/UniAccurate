@@ -297,6 +297,16 @@ proc ua_norm_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   scaledEuclideanNorm(toOpenArray(arr, 0, last))
 
+proc ua_mean_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  if n == 0:
+    return NaN
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  try:
+    scaledMean(toOpenArray(arr, 0, last))
+  except ValueError:
+    NaN
+
 proc ua_centered_sum_squares(x: ptr cdouble; n: csize_t;
     center: cdouble): cdouble {.raises: [].} =
   if n == 0:
@@ -314,5 +324,18 @@ proc ua_centered_cross_product(x, y: ptr cdouble; n: csize_t; centerX,
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   centeredCrossProduct(toOpenArray(ax, 0, last), toOpenArray(ay, 0, last),
     centerX, centerY)
+
+proc ua_centered_cosine_similarity(x, y: ptr cdouble; n: csize_t; centerX,
+    centerY: cdouble): cdouble {.raises: [].} =
+  if n == 0:
+    return NaN
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  try:
+    centeredCosineSimilarity(toOpenArray(ax, 0, last),
+      toOpenArray(ay, 0, last), centerX, centerY)
+  except ValueError:
+    NaN
 
 {.pop.}

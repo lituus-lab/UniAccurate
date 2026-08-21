@@ -134,12 +134,24 @@ double ua_condition_number(const double *x, size_t n);
  * reentrant. Null x with n > 0 is undefined. */
 double ua_norm_scaled(const double *x, size_t n);
 
+/* Mean formed as the exact sum of represented x[i]/n quotients. This avoids
+ * overflow of an otherwise representable mean. Empty input returns NaN.
+ * Never raises; single-threaded and reentrant. Null x with n > 0 is undefined. */
+double ua_mean_scaled(const double *x, size_t n);
+
 /* Centered products over represented deviations. The exact superaccumulator
  * rounds the product sum once. Empty input is 0. Never raises; single-threaded
  * and reentrant. Null input with n > 0 is undefined. */
 double ua_centered_sum_squares(const double *x, size_t n, double center);
 double ua_centered_cross_product(const double *x, const double *y, size_t n,
                                  double center_x, double center_y);
+
+/* Centered cosine similarity with deviations normalized before the exact dot.
+ * Empty or constant centered input returns NaN. Never raises; single-threaded
+ * and reentrant. Null input with n > 0 is undefined. */
+double ua_centered_cosine_similarity(const double *x, const double *y,
+                                     size_t n, double center_x,
+                                     double center_y);
 
 #ifdef __cplusplus
 }
