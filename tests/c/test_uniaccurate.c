@@ -212,10 +212,15 @@ int main(void) {
                                           1e10 + 1.0, 4.0);
     double cosine = ua_centered_cosine_similarity(
       (double[]){1e308, -1e308}, (double[]){1e308, -1e308}, 2, 0.0, 0.0);
-    if (ss != 2.0 || cp != 4.0 || fabs(cosine - 1.0) > 2e-15) {
-      printf("FAIL centered reductions: got (%g, %g, %g)\n", ss, cp, cosine);
+    double projection = ua_centered_projection_coefficient(
+      (double[]){1e308, 0.0, -1e308},
+      (double[]){1e308, 0.0, -1e308}, 3, 0.0, 0.0);
+    if (ss != 2.0 || cp != 4.0 || fabs(cosine - 1.0) > 2e-15 ||
+        projection != 1.0) {
+      printf("FAIL centered reductions: got (%g, %g, %g, %g)\n",
+             ss, cp, cosine, projection);
       failures++;
-    } else printf("ok   centered reductions = (2, 4, 1)\n"); }
+    } else printf("ok   centered reductions = (2, 4, 1, 1)\n"); }
 
   if (failures == 0) { printf("\nAll C ABI tests passed.\n"); return 0; }
   printf("\n%d C ABI test(s) FAILED.\n", failures);
