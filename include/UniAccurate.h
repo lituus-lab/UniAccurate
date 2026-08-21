@@ -153,6 +153,13 @@ double ua_centered_cosine_similarity(const double *x, const double *y,
                                      size_t n, double center_x,
                                      double center_y);
 
+/* Range-safe centered projection coefficient sum(dx*dy) / sum(dx*dx).
+ * Empty or constant centered x returns NaN. Never raises; single-threaded and
+ * reentrant. Null input with n > 0 is undefined. */
+double ua_centered_projection_coefficient(const double *x, const double *y,
+                                          size_t n, double center_x,
+                                          double center_y);
+
 #ifdef __cplusplus
 }
 #endif
