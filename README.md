@@ -47,7 +47,8 @@ Python side.
   (`dot2`/`dotK3`), and a correctly-rounded `superDot`.
 - **Statistical reductions** (`algorithms/statistical_reductions.nim`) —
   range-safe mean and Euclidean norm, exact sums of represented centered
-  products, and centered cosine similarity without raw square overflow.
+  products, centered cosine similarity, and centered projection coefficients
+  without raw square overflow.
 - **SIMD kernels** (`simd.nim`) — AVX2/AVX-512 (amd64) and NEON (arm64)
   vectorized sum/dot, see ADR-0005 and ADR-0007. The direct Nim API and the
   sum family stay opt-in via `-d:simd`; the C ABI dot family (`ua_dot_naive`/
