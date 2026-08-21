@@ -43,7 +43,7 @@ uniaccurate.scaled_norm([3.0, 4.0])                   # 5.0
 | Correctly-rounded summation | `shewchuk_sum`, `exact_sum`, `oro_sum`, `acc_sum`, `near_sum` |
 | Dot product | `naive_dot`, `dot2`, `dot_k`, `exact_dot` |
 | Diagnostics | `condition_number` |
-| Statistical reductions | `scaled_norm`, `centered_sum_squares`, `centered_cross_product` |
+| Statistical reductions | `scaled_mean`, `scaled_norm`, `centered_sum_squares`, `centered_cross_product`, `centered_cosine_similarity` |
 
 Every function raises `TypeError` on non-numeric input rather than silently
 coercing; see each docstring (`help(uniaccurate.kahan_sum)`) for the exact
