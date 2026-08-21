@@ -1,0 +1,33 @@
+{
+  "provider": "UniAccurate",
+  "version": "1.2.0",
+  "operation": "statistical-reductions",
+  "compiler": "2.2.10",
+  "machine": "Apple M4",
+  "memory_manager": "orc",
+  "point_count": 100000,
+  "warmups_per_run": 3,
+  "iterations_per_run": 20,
+  "runs": 3,
+  "norm_semantics": "allocation-free scaled recurrence",
+  "centered_semantics": "deviation allocation plus exact superaccumulator",
+  "norm_run_mean_ms": [
+    0.4060354,
+    0.3577584000000001,
+    0.35300000000000004
+  ],
+  "centered_squares_run_mean_ms": [
+    0.61223975,
+    0.5544271999999999,
+    0.5454041
+  ],
+  "centered_cross_run_mean_ms": [
+    0.6436,
+    0.5808686500000001,
+    0.5715896000000001
+  ],
+  "norm_median_ms": 0.3577584000000001,
+  "centered_squares_median_ms": 0.5544271999999999,
+  "centered_cross_median_ms": 0.5808686500000001,
+  "guard": 218791111333896.2
+}
