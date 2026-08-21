@@ -290,4 +290,29 @@ proc ua_condition_number(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
   conditionNumber(toOpenArray(arr, 0, last))
 
+proc ua_norm_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  scaledEuclideanNorm(toOpenArray(arr, 0, last))
+
+proc ua_centered_sum_squares(x: ptr cdouble; n: csize_t;
+    center: cdouble): cdouble {.raises: [].} =
+  if n == 0:
+    return 0.0
+  let arr = cast[ptr UncheckedArray[cdouble]](x)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  centeredSumSquares(toOpenArray(arr, 0, last), center)
+
+proc ua_centered_cross_product(x, y: ptr cdouble; n: csize_t; centerX,
+    centerY: cdouble): cdouble {.raises: [].} =
+  if n == 0:
+    return 0.0
+  let ax = cast[ptr UncheckedArray[cdouble]](x)
+  let ay = cast[ptr UncheckedArray[cdouble]](y)
+  let last = if n > csize_t(high(int)): high(int) - 1 else: int(n) - 1
+  centeredCrossProduct(toOpenArray(ax, 0, last), toOpenArray(ay, 0, last),
+    centerX, centerY)
+
 {.pop.}

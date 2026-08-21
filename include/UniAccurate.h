@@ -129,6 +129,18 @@ double ua_sum_k(const double *x, size_t n, int k);
  * undefined. */
 double ua_condition_number(const double *x, size_t n);
 
+/* Scaled Euclidean norm. Intermediate squares cannot overflow or underflow.
+ * Empty input is 0; NaN/Inf propagate. Never raises; single-threaded and
+ * reentrant. Null x with n > 0 is undefined. */
+double ua_norm_scaled(const double *x, size_t n);
+
+/* Centered products over represented deviations. The exact superaccumulator
+ * rounds the product sum once. Empty input is 0. Never raises; single-threaded
+ * and reentrant. Null input with n > 0 is undefined. */
+double ua_centered_sum_squares(const double *x, size_t n, double center);
+double ua_centered_cross_product(const double *x, const double *y, size_t n,
+                                 double center_x, double center_y);
+
 #ifdef __cplusplus
 }
 #endif
