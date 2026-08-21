@@ -36,7 +36,8 @@ proc main() =
     y[index] = -1e8 + (index mod 509).float64 * 0.5
   let centerX = 1e10 + 510.0
   let centerY = -1e8 + 127.0
-  var meanRuns, normRuns, squaresRuns, crossRuns, cosineRuns: seq[float64]
+  var meanRuns, normRuns, squaresRuns, crossRuns, cosineRuns, projectionRuns:
+    seq[float64]
   var guard: float64
   for _ in 0 ..< Runs:
     for _ in 0 ..< Warmups:
@@ -45,8 +46,9 @@ proc main() =
       guard += centeredSumSquares(x, centerX)
       guard += centeredCrossProduct(x, y, centerX, centerY)
       guard += centeredCosineSimilarity(x, y, centerX, centerY)
+      guard += centeredProjectionCoefficient(x, y, centerX, centerY)
     var meanSamples, normSamples, squaresSamples, crossSamples,
-      cosineSamples: seq[float64]
+      cosineSamples, projectionSamples: seq[float64]
     for _ in 0 ..< Iterations:
       let meanElapsed = elapsed: guard += scaledMean(x)
       let normElapsed = elapsed: guard += scaledEuclideanNorm(x)
@@ -55,16 +57,20 @@ proc main() =
         guard += centeredCrossProduct(x, y, centerX, centerY)
       let cosineElapsed = elapsed:
         guard += centeredCosineSimilarity(x, y, centerX, centerY)
+      let projectionElapsed = elapsed:
+        guard += centeredProjectionCoefficient(x, y, centerX, centerY)
       meanSamples.add meanElapsed
       normSamples.add normElapsed
       squaresSamples.add squaresElapsed
       crossSamples.add crossElapsed
       cosineSamples.add cosineElapsed
+      projectionSamples.add projectionElapsed
     meanRuns.add average(meanSamples)
     normRuns.add average(normSamples)
     squaresRuns.add average(squaresSamples)
     crossRuns.add average(crossSamples)
     cosineRuns.add average(cosineSamples)
+    projectionRuns.add average(projectionSamples)
   let report = %*{
     "provider": "UniAccurate",
     "version": UniAccurateVersion,
@@ -80,16 +86,19 @@ proc main() =
     "norm_semantics": "allocation-free scaled recurrence",
     "centered_semantics": "deviation allocation plus exact superaccumulator",
     "cosine_semantics": "normalized deviations plus exact dot and scaled norms",
+    "projection_semantics": "normalized centered projection with binary scale ratio",
     "mean_run_mean_ms": meanRuns,
     "norm_run_mean_ms": normRuns,
     "centered_squares_run_mean_ms": squaresRuns,
     "centered_cross_run_mean_ms": crossRuns,
     "centered_cosine_run_mean_ms": cosineRuns,
+    "centered_projection_run_mean_ms": projectionRuns,
     "mean_median_ms": median(meanRuns),
     "norm_median_ms": median(normRuns),
     "centered_squares_median_ms": median(squaresRuns),
     "centered_cross_median_ms": median(crossRuns),
     "centered_cosine_median_ms": median(cosineRuns),
+    "centered_projection_median_ms": median(projectionRuns),
     "guard": guard
   }
   createDir(parentDir(output))
