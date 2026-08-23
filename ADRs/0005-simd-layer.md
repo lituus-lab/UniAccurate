@@ -26,7 +26,8 @@ SIMD-block, scalar-merge scheme. `naive` and `pairwise` carry no reliability
 flag; `pairwise` reuses `PairwiseThreshold` with a SIMD naive base case.
 
 ISA selection is compile-time, by `defined(avx512)` / `defined(avx2)` /
-`defined(arm64)` — nimsimd branches on the same defines. `config.nims` adds the matching `-mavx512f -mfma` / `-mavx2 -mfma` (or
+`defined(arm64)` — nimsimd branches on the same defines. `config.nims` adds
+the matching `-mavx512f -mfma` / `-mavx2 -mfma` (or
 `/arch:AVX512` / `/arch:AVX2` under MSVC, which implies FMA); arm64 needs
 nothing, NEON-FMA is the base ISA. `-d:scalarUniAccurate` opts out.
 

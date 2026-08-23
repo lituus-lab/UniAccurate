@@ -85,7 +85,7 @@ that speed from a blank page.
 
 ## Layout
 
-```
+```text
 src/UniAccurate.nim          umbrella module
 src/UniAccurate/twosum.nim   error-free transforms (NimContracts)
 src/UniAccurate/algorithms/  summation and dot-product kernels (NimContracts)
@@ -139,6 +139,7 @@ machine (say a FreeBSD/Zen4 box, `UNIACCURATE_BENCH_MACHINE` env var to name
 it explicitly) adds its own block alongside, so this table can carry more
 than one machine's numbers at once without either overwriting the other.
 
+<!-- markdownlint-disable MD013 MD036 -->
 <!-- bench:insert -->
 
 <!-- bench:machine=macosx-apple-m4 -->
@@ -177,6 +178,8 @@ Python 3.14.6 (CPython)
 | array.array input | 9.086 |
 
 <!-- /bench:machine=macosx-apple-m4 -->
+
+<!-- markdownlint-enable MD013 MD036 -->
 
 See ADR-0007 for the full lever-by-lever analysis (the `isFin` bit-mask, FMA
 enablement, `assumeFinite`, `useFastTwoSum`) and `bench/compare/summary.md`

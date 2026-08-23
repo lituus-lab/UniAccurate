@@ -32,7 +32,7 @@ not to EFT codegen**: with the `assumeFinite` opt-in (no guard) Nim already
 matched C, proving the EFT recurrence inlines correctly.
 
 Replaced with a bit-mask test (exponent field all-ones ⇔ NaN/±Inf): one `and`
-+ one compare, fully inlinable, bit-identical semantics. This fixes the
+plus one compare, fully inlinable, bit-identical semantics. This fixes the
 **default** path — every caller benefits, no opt-in needed:
 `kahan` 2.30 vs C 2.28, `klein` 1.47 vs C 1.54 (Zen4 f64, n=1M).
 
