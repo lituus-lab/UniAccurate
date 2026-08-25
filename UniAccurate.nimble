@@ -167,12 +167,12 @@ task clib, "C shared library":
        " src/UniAccurate/c_api.nim"
 
 task clibStatic, "C static library":
-  exec "nim c --app:staticlib --noMain --mm:arc -d:release -o:" & staticLib &
+  exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -o:" & staticLib &
        " src/UniAccurate/c_api.nim"
 
 task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # CPython on Windows is MSVC-built and cannot link MinGW output.
-  exec "nim c --cc:vcc --app:staticlib --noMain --mm:arc -d:release" &
+  exec "nim c --cc:vcc --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release" &
        " -o:UniAccurate.lib src/UniAccurate/c_api.nim"
 
 # Nim's MinGW toolchain names it mingw32-make.
@@ -237,7 +237,7 @@ task clibSimd, "C shared library with -d:simd (host ISA)":
        " -o:" & sharedLib & macArgs & " src/UniAccurate/c_api.nim"
 
 task ctestSimd, "C ABI tests with -d:simd (host ISA)":
-  exec "nim c --app:staticlib --noMain --mm:arc -d:release -d:simd" & simdArch &
+  exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -d:simd" & simdArch &
        " -o:" & staticLib & " src/UniAccurate/c_api.nim"
   exec makeExe & " -C tests/c" & makeWinArgs
 

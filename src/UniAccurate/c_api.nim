@@ -9,6 +9,47 @@ import ./simd_dispatch
 const UniAccurateVersionC: cstring = "1.2.0"
 
 # Unmangled C symbols, C calling convention, exported from the shared lib.
+
+# A shared library runs NimMain from DllMain (Windows) or an ELF constructor;
+# a static one has neither, so nothing initializes the Nim runtime. The first
+# entry point then enters Nim code whose globals were never set up and the
+# process faults. The static-library tasks pass -d:staticNoAutoInit; shared
+# builds must not, or NimMain runs twice.
+when defined(staticNoAutoInit):
+  # A once primitive, not a plain flag: two threads reaching an entry point
+  # together would both see the flag unset, both call NimMain, and the second
+  # would enter Nim code the first had not finished initializing. The platform
+  # primitives block the losers until the winner returns, which a flag cannot.
+  #
+  # C statics, not Nim globals: module initialization would reset a Nim one and
+  # NimMain would run again. NimMain is declared here too — the generated
+  # prototype comes after this section.
+  {.emit: """/*VARSECTION*/
+void NimMain(void);
+#ifdef _WIN32
+#  include <windows.h>
+static INIT_ONCE ua_runtime_once = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK ua_runtime_init(PINIT_ONCE o, PVOID p, PVOID *c) {
+  (void)o; (void)p; (void)c; NimMain(); return TRUE;
+}
+static void ua_runtime_ensure(void) {
+  InitOnceExecuteOnce(&ua_runtime_once, ua_runtime_init, NULL, NULL);
+}
+#else
+#  include <pthread.h>
+static pthread_once_t ua_runtime_once = PTHREAD_ONCE_INIT;
+static void ua_runtime_init(void) { NimMain(); }
+static void ua_runtime_ensure(void) {
+  pthread_once(&ua_runtime_once, ua_runtime_init);
+}
+#endif
+""".}
+  template ensureRuntime() =
+    {.emit: "  ua_runtime_ensure();".}
+else:
+  template ensureRuntime() = discard
+
+
 {.push exportc, cdecl, dynlib.}
 
 proc ua_two_sum(a, b: cdouble; s, e: ptr cdouble) {.raises: [].} =
@@ -16,6 +57,7 @@ proc ua_two_sum(a, b: cdouble; s, e: ptr cdouble) {.raises: [].} =
   ## exactly in real arithmetic (Møller–Knuth TwoSum). For non-finite `a` or
   ## `b`, `*s = a + b` (IEEE) and `*e = NaN`. Never raises. Null `s` or `e` is
   ## undefined.
+  ensureRuntime()
   if classify(a) in {fcNan, fcInf, fcNegInf} or
       classify(b) in {fcNan, fcInf, fcNegInf}:
     s[] = a + b
@@ -27,11 +69,13 @@ proc ua_two_sum(a, b: cdouble; s, e: ptr cdouble) {.raises: [].} =
 
 proc ua_version(): cstring {.exportc, cdecl, dynlib.} =
   ## Static version string; do not free.
+  ensureRuntime()
   UniAccurateVersionC
 
 proc ua_sum_naive(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Naive (sequential) sum of `n` doubles at `x`. Empty input is `0`. Never
   ## raises; NaN/Inf propagate. Null `x` with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -49,6 +93,7 @@ proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Recursive pairwise sum of `n` doubles at `x`. Empty input is `0`. Never
   ## raises; NaN/Inf propagate (opposite-sign overflow can yield NaN). Null `x`
   ## with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -65,6 +110,7 @@ proc ua_sum_pairwise(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
 proc ua_sum_pairwise_iterative(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Iterative (bottom-up) pairwise sum of `n` doubles at `x`. Empty input is
   ## `0`. Never raises; NaN/Inf propagate. Null `x` with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -75,6 +121,7 @@ proc ua_sum_kahan(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Kahan compensated sum of `n` doubles at `x`. Empty input is `0`. Never
   ## raises; NaN/Inf propagate. Finite inputs never yield NaN (overflow ⇒ ±Inf).
   ## Null `x` with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -93,6 +140,7 @@ proc ua_sum_neumaier(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Kahan-Babuska-Neumaier (magnitude-robust) compensated sum of `n` doubles at
   ## `x`. Empty input is `0`. Never raises; NaN/Inf propagate. Finite inputs
   ## never yield NaN. Null `x` with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -111,6 +159,7 @@ proc ua_sum_klein(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## Klein two-level compensated sum of `n` doubles at `x`. Empty input is `0`.
   ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN. Null `x`
   ## with `n > 0` is undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -133,6 +182,7 @@ proc ua_sum_shewchuk(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## exact expansion and yields a correctly-signed ±Inf (finite input never
   ## yields NaN). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar
   ## under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -145,6 +195,7 @@ proc ua_sum_exact(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## input is `0`. Never raises; NaN/Inf propagate. Finite inputs never yield NaN
   ## (true overflow ⇒ ±Inf, opposite-sign overflow cancels exactly). Null `x`
   ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -158,6 +209,7 @@ proc ua_dot_exact(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## never yield NaN (products held at true magnitude, opposite-sign overflow
   ## cancels exactly). Null `x` or `y` with `n > 0` is undefined. No SIMD kernel —
   ## scalar under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -175,6 +227,7 @@ proc ua_dot_naive(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## real CPUID check (`simd_dispatch.nim`, ADR-0008) -- no `-d:simd` needed; the
   ## `superDot` fallback is shared with the scalar path. Other targets (NEON
   ## float64 has no SIMD path) use the scalar kernel directly.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -195,6 +248,7 @@ proc ua_dot2(x, y: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## with a lane-concentration guard that falls back to the scalar `dot2` on
   ## cancellation data. Other targets (NEON float64 has no SIMD path) use the
   ## scalar kernel directly.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -215,6 +269,7 @@ proc ua_dot_k(x, y: ptr cdouble; n: csize_t; k: cint): cdouble {.raises: [].} =
   ## scalar body; other `k` run the scalar cascade on every target (no generic-K
   ## SIMD kernel exists). Other targets (NEON float64 has no SIMD path) always
   ## use the scalar cascade.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -234,6 +289,7 @@ proc ua_sum_oro(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## to `neumaierSum`. Empty input is `0`. Never raises; NaN/Inf propagate.
   ## Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is
   ## undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -246,6 +302,7 @@ proc ua_sum_near(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## propagate (non-finite input or a `sigma0` overflow falls back to the exact
   ## superaccumulator). Finite inputs never yield NaN (overflow ⇒ ±Inf). Null `x`
   ## with `n > 0` is undefined. No SIMD kernel — scalar under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -259,6 +316,7 @@ proc ua_sum_acc(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## superaccumulator, which is correctly-rounded and so still faithful). Finite
   ## inputs never yield NaN (overflow ⇒ ±Inf). Null `x` with `n > 0` is undefined.
   ## No SIMD kernel — scalar under `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -272,6 +330,7 @@ proc ua_sum_k(x: ptr cdouble; n: csize_t; k: cint): cdouble {.raises: [].} =
   ## Never raises; NaN/Inf propagate. Finite inputs never yield NaN (overflow ⇒
   ## ±Inf). Null `x` with `n > 0` is undefined. No SIMD kernel — scalar under
   ## `-d:simd` (ADR-0006).
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -284,6 +343,7 @@ proc ua_condition_number(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   ## the sum is exactly `0` or `Σ|xᵢ|` overflows the float range, `0` for empty
   ## input. Never raises; finite inputs never yield NaN. Null `x` with `n > 0` is
   ## undefined.
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -291,6 +351,7 @@ proc ua_condition_number(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   conditionNumber(toOpenArray(arr, 0, last))
 
 proc ua_norm_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -298,6 +359,7 @@ proc ua_norm_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
   scaledEuclideanNorm(toOpenArray(arr, 0, last))
 
 proc ua_mean_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return NaN
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -309,6 +371,7 @@ proc ua_mean_scaled(x: ptr cdouble; n: csize_t): cdouble {.raises: [].} =
 
 proc ua_centered_sum_squares(x: ptr cdouble; n: csize_t;
     center: cdouble): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return 0.0
   let arr = cast[ptr UncheckedArray[cdouble]](x)
@@ -317,6 +380,7 @@ proc ua_centered_sum_squares(x: ptr cdouble; n: csize_t;
 
 proc ua_centered_cross_product(x, y: ptr cdouble; n: csize_t; centerX,
     centerY: cdouble): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return 0.0
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -327,6 +391,7 @@ proc ua_centered_cross_product(x, y: ptr cdouble; n: csize_t; centerX,
 
 proc ua_centered_cosine_similarity(x, y: ptr cdouble; n: csize_t; centerX,
     centerY: cdouble): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return NaN
   let ax = cast[ptr UncheckedArray[cdouble]](x)
@@ -340,6 +405,7 @@ proc ua_centered_cosine_similarity(x, y: ptr cdouble; n: csize_t; centerX,
 
 proc ua_centered_projection_coefficient(x, y: ptr cdouble; n: csize_t; centerX,
     centerY: cdouble): cdouble {.raises: [].} =
+  ensureRuntime()
   if n == 0:
     return NaN
   let ax = cast[ptr UncheckedArray[cdouble]](x)
