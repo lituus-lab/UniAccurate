@@ -84,6 +84,15 @@ const
     ## `a` and compute the split in float64, silently breaking the 12-bit
     ## split).
 
+# Every EFT here returns `(s, e)` -- the rounded result and its exact error.
+# The postconditions used to read `result[0]` and `result[1]`, which the
+# contract layer renders into the doc comment, where the generator reads `[0]`
+# as a link reference and reports twenty-nine broken links per build. These
+# name the two halves instead. Private: the return type stays the anonymous
+# tuple it has been since 1.0.0.
+func hiOf[T: SomeFloat](p: (T, T)): T {.inline.} = p[0]
+func loOf[T: SomeFloat](p: (T, T)): T {.inline.} = p[1]
+
 func ulp*[T: SomeFloat](x: T): T {.inline.} =
   ## Unit in the Last Place of `x`: the spacing of floats in the binade
   ## containing `|x|` — the "ulp above" convention (Goldberg 1991). Constant
@@ -183,9 +192,9 @@ func split*[T: SomeFloat](a: T): (T, T) {.contractual, inline.} =
     # Huge normals overflow `SplitFactor*a` to Inf/NaN (recombination fails);
     # subnormals near underflow can round. Tolerate both, mirroring the EFT
     # primitives' overflow handling.
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or
       classify(a) in {fcSubnormal, fcZero, fcNegZero} or
-      result[0] + result[1] == a
+      hiOf(result) + loOf(result) == a
   body:
     when T is float32:
       let c = SplitFactor32 * a
@@ -207,8 +216,8 @@ func fastTwoSum*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     abs(a) >= abs(b)
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-        result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+        ulp(hiOf(result))
   body:
     result[0] = a + b
     result[1] = b - (result[0] - a)
@@ -223,8 +232,8 @@ func twoSum*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-        result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+        ulp(hiOf(result))
   body:
     result[0] = a + b
     let z = result[0] - a
@@ -245,8 +254,8 @@ func twoSumFast*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-        result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+        ulp(hiOf(result))
   body:
     if abs(a) >= abs(b):
       result = fastTwoSum(a, b)
@@ -261,8 +270,8 @@ func twoDiff*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-        result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+        ulp(hiOf(result))
   body:
     result[0] = a - b
     let z = result[0] - a
@@ -289,9 +298,9 @@ func twoProduct*[T: SomeFloat](a, b: T): (T, T) {.contractual, inline.} =
     classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     a == T(0) or b == T(0) or a * b != T(0) # reject total product underflow
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or
-      classify(result[1]) in {fcNan} or # split-overflow regime (no-FMA fallback)
-      abs(result[1]) <= ulp(result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or
+      classify(loOf(result)) in {fcNan} or # split-overflow regime (no-FMA fallback)
+      abs(loOf(result)) <= ulp(hiOf(result))
   body:
     result[0] = a * b
     let (ah, al) = split(a)
@@ -332,8 +341,8 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       a == 0.0 or b == 0.0 or a * b != 0.0
     ensure:
-      classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-          result[0])
+      classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+          ulp(hiOf(result))
     body:
       result[0] = a * b
       result[1] = libmFma(a, b, -result[0])
@@ -347,8 +356,8 @@ when defined(useFMA) or defined(amd64) or defined(arm64):
       classify(b) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
       a == 0.0'f32 or b == 0.0'f32 or a * b != 0.0'f32
     ensure:
-      classify(result[0]) in {fcInf, fcNegInf, fcNan} or abs(result[1]) <= ulp(
-          result[0])
+      classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or abs(loOf(result)) <=
+          ulp(hiOf(result))
     body:
       result[0] = a * b
       result[1] = libmFmaf(a, b, -result[0])

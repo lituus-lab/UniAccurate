@@ -6,7 +6,7 @@ import std/math
 import ../UniAccurate
 import ./simd_dispatch
 
-const UniAccurateVersionC: cstring = "1.2.0"
+const UniAccurateVersionC: cstring = "1.1.0"
 
 # Unmangled C symbols, C calling convention, exported from the shared lib.
 

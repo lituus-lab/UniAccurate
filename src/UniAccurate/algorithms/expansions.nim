@@ -35,6 +35,13 @@ import std/math
 import contracts
 import ../twosum
 
+# The two halves of an EFT pair, named. Duplicated from `twosum`, where they
+# are private: exporting them would widen the public surface for two lines
+# that exist only so a postcondition does not put `[0]` in a doc comment,
+# where the generator reads it as a link reference.
+func hiOf[T: SomeFloat](p: (T, T)): T {.inline.} = p[0]
+func loOf[T: SomeFloat](p: (T, T)): T {.inline.} = p[1]
+
 const
   splitter* = SplitFactor64
     ## Shewchuk's name for the Veltkamp split factor (`SplitFactor64`, `2^27+1`).
@@ -51,9 +58,9 @@ func twoSquare*[T: SomeFloat](a: T): (T, T) {.contractual, inline.} =
     classify(a) in {fcNormal, fcSubnormal, fcZero, fcNegZero}
     a == T(0) or a * a != T(0) # reject total product underflow
   ensure:
-    classify(result[0]) in {fcInf, fcNegInf, fcNan} or
-      classify(result[1]) in {fcNan} or
-      abs(result[1]) <= ulp(result[0])
+    classify(hiOf(result)) in {fcInf, fcNegInf, fcNan} or
+      classify(loOf(result)) in {fcNan} or
+      abs(loOf(result)) <= ulp(hiOf(result))
   body:
     result[0] = a * a
     let (ah, al) = split(a)

@@ -6,8 +6,8 @@ import uniaccurate
 
 
 def test_version():
-    assert uniaccurate.version() == "1.2.0"
-    assert uniaccurate.__version__ == "1.2.0"
+    assert uniaccurate.version() == "1.1.0"
+    assert uniaccurate.__version__ == "1.1.0"
 
 
 def test_representable_sum_error_is_zero():

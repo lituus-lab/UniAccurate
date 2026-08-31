@@ -449,6 +449,9 @@ when defined(simd):
     result = pairwiseSimdRec(x, lo, m - 1) + pairwiseSimdRec(x, m, hi)
 
   func pairwiseSumSimd*[T: SomeFloat](x: openArray[T]): T {.contractual.} =
+    ## Pairwise summation with the recursion's leaves vectorised. Falls back
+    ## to the scalar `pairwiseSum` where no SIMD path was compiled in, so the
+    ## answer is the same everywhere and only the speed differs.
     ensure:
       x.len != 0 or result == T(0)
     body:
@@ -461,6 +464,9 @@ when defined(simd):
 
   func kahanSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
       T] {.contractual.} =
+    ## Kahan summation, vectorised. Returns the sum and whether a SIMD path
+    ## actually ran: `false` means the scalar `kahanSum` produced it, which the
+    ## caller needs to know only if it is measuring, never to trust the value.
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:
@@ -473,6 +479,9 @@ when defined(simd):
 
   func neumaierSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
       T] {.contractual.} =
+    ## Neumaier summation, vectorised, with the same reliability flag as
+    ## `kahanSumSimd`. Neumaier compensates where Kahan loses the correction:
+    ## when the running sum is smaller than the addend.
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:
@@ -485,6 +494,9 @@ when defined(simd):
 
   func kleinSumSimd*[T: SomeFloat](x: openArray[T]): SimdResult[
       T] {.contractual.} =
+    ## Klein's second-order compensated summation, vectorised, with the same
+    ## reliability flag. It carries two correction terms where Neumaier carries
+    ## one.
     ensure:
       x.len != 0 or (result[0] == T(0) and result[1])
     body:

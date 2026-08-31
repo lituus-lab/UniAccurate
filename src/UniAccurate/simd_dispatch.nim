@@ -128,6 +128,10 @@ when defined(amd64) and not defined(vcc):
 
   proc dispatchNaiveDot*(x, y: openArray[float64]): float64 {.contractual,
       raises: [].} =
+    ## The plain dot product, through the kernel this CPU actually has. The
+    ## choice is made once by CPUID at first call and cached in a proc pointer;
+    ## nothing here is decided at compile time, so one binary runs on a machine
+    ## with AVX-512 and on one without.
     require:
       x.len == y.len
     body:
@@ -136,6 +140,10 @@ when defined(amd64) and not defined(vcc):
 
   proc dispatchDot2*(x, y: openArray[float64]): float64 {.contractual,
       raises: [].} =
+    ## The compensated dot product, dispatched the same way. When the chosen
+    ## kernel reports its result unreliable, the scalar `dot2` is run instead
+    ## and its answer returned -- the compensation is the point of the call,
+    ## and a fast wrong number is not a cheaper right one.
     require:
       x.len == y.len
     body:
@@ -145,6 +153,8 @@ when defined(amd64) and not defined(vcc):
 
   proc dispatchDotK3*(x, y: openArray[float64]): float64 {.contractual,
       raises: [].} =
+    ## The K-fold compensated dot product at K = 3, dispatched and with the
+    ## same fallback as `dispatchDot2`.
     require:
       x.len == y.len
     body:
