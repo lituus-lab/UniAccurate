@@ -329,7 +329,7 @@ task ctestSimd, "C ABI tests with -d:simd (host ISA)":
   done "ctestSimd"
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
-  exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
+  exec "python3 -m pip install --break-system-packages --quiet --upgrade \"setuptools>=77\" wheel \"Cython>=3.0.0\" pytest"
   done "pyDeps"
 
 # The extension links the vcc static lib on Windows, the shared lib elsewhere.
@@ -361,8 +361,12 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   # gcov and lcov driven directly, no coco. Linux and macOS only.
   # --debugger:native attributes lines to the .nim sources, not the generated C.
   # --include keeps stdlib out of the capture, where lcov 2.x aborts on Nim's
-  # codegen. Together they leave nothing to suppress: no --ignore-errors here,
-  # so a real problem still fails the build.
+  # codegen.
+  # `mismatch` is the one suppression, and it is not optional: lcov 2.x checks
+  # its own end line for a function against gcov's, and Nim's generated
+  # destructors disagree -- a closure environment, a seq, NimContracts'
+  # PostConditionDefect. Removing one only advances lcov to the next, so there
+  # is no source-level fix. Every other lcov error still fails the build.
   let cache = "build/covcache"
   rmDir cache
   rmDir "coverage"
@@ -389,8 +393,12 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
          " -o:build/cov_" & t & " tests/" & t & ".nim"
     exec "./build/cov_" & t
   exec "lcov --capture --directory " & cache & " --base-directory ." &
-       " --include \"*/src/UniAccurate/*\" --output-file lcov.info --quiet"
-  exec "genhtml lcov.info --output-directory coverage --legend --quiet"
+       " --include \"*/src/UniAccurate/*\" --output-file lcov.info --quiet --ignore-errors mismatch"
+  # gcov can attribute a final generated expression to EOF + 1; `range` is
+  # genhtml's documented filter for precisely that compiler artifact, and
+  # lcov 2.x wants the matching category allowance before it applies it.
+  exec "genhtml lcov.info --filter range --ignore-errors range" &
+       " --output-directory coverage --legend --quiet"
   exec "lcov --summary lcov.info"
   done "coverage"
 
