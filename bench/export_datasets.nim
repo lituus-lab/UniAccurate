@@ -39,11 +39,12 @@ proc seedFor(typeTag: string, di: int, n: int): int64 =
   ## Seed formula shared with the Nim driver: identical inputs.
   0x5eed'i64 + n.int64 * 131 + di.int64 * 17 + typeTag.len.int64
 
-proc exportType(T: typedesc, typeTag: string, sizes: seq[int], manifest: var File) =
+proc exportType(T: typedesc, typeTag: string, sizes: seq[int],
+    manifest: var File) =
   for n in sizes:
     for di, ds in Datasets:
       let seedX = seedFor(typeTag, di, n)
-      let seedY = seedX xor 0x9e57'i64  # paired dot operand, deterministic
+      let seedY = seedX xor 0x9e57'i64 # paired dot operand, deterministic
       let x = genDataset(T, ds, n, seedX)
       let y = genDataset(T, ds, n, seedY)
       let stem = CanonicalDir / (typeTag & "_" & ds & "_" & $n)
@@ -52,7 +53,8 @@ proc exportType(T: typedesc, typeTag: string, sizes: seq[int], manifest: var Fil
       writeRaw(xPath, x)
       writeRaw(yPath, y)
       # type,dataset,n,bytes_per_elem,n_elems,x_file,y_file
-      manifest.writeLine(typeTag & "," & ds & "," & $n & "," & $sizeof(T) & "," &
+      manifest.writeLine(typeTag & "," & ds & "," & $n & "," & $sizeof(T) &
+          "," &
         $x.len & "," & xPath & "," & yPath)
 
 proc run(quick: bool) =

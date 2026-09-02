@@ -17,15 +17,16 @@ proc callAlgo*(name: string, T: typedesc, x: openArray[T]): T {.inline.} =
   ## Dispatch to the named UniAccurate algorithm. Kept as a string-keyed `case`
   ## (not a proc table) so the compiler inlines the chosen body into each harness.
   case name
-  of "naive":     result = naiveSum(x)
-  of "pairwise":  result = pairwiseSum(x)
-  of "kahan":     result = kahanSum(x)
-  of "neumaier":  result = neumaierSum(x)
-  of "klein":     result = kleinSum(x)
+  of "naive": result = naiveSum(x)
+  of "pairwise": result = pairwiseSum(x)
+  of "kahan": result = kahanSum(x)
+  of "neumaier": result = neumaierSum(x)
+  of "klein": result = kleinSum(x)
   of "shewchuk": result = shewchukSum(x)
   else: raise newException(ValueError, "unknown algorithm: " & name)
 
-proc genDataset*[T: SomeFloat](t: typedesc[T], name: string, n: int, seed: int64): seq[T] =
+proc genDataset*[T: SomeFloat](t: typedesc[T], name: string, n: int,
+    seed: int64): seq[T] =
   ## Deterministic dataset of `n` values of type `T`, seeded by `seed`. The six
   ## shapes exercise the regimes that matter for summation accuracy and cost:
   ##
@@ -41,7 +42,7 @@ proc genDataset*[T: SomeFloat](t: typedesc[T], name: string, n: int, seed: int64
   ##                 usable exponent range; mixed magnitudes, guard-bit stress.
   var r = initRand(seed)
   result = newSeq[T](n)
-  template u2: float = (rand(r, 0.0 .. 1.0) - 0.5) * 2.0  # uniform in [-1, 1]
+  template u2: float = (rand(r, 0.0 .. 1.0) - 0.5) * 2.0 # uniform in [-1, 1]
   case name
   of "uniform":
     for i in 0 ..< n: result[i] = T(u2())

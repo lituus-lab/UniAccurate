@@ -267,11 +267,13 @@ proc main() =
         row &= " " & (if v > 0: v.formatFloat(ffDecimal, 4) else: "-") & " |"
       let nimV = cell.getOrDefault(("f64", algo, n, "nim"))
       let cV = cell.getOrDefault(("f64", algo, n, "c"))
-      row &= " " & (if nimV > 0 and cV > 0: (nimV / cV).formatFloat(ffDecimal, 2) & "x" else: "-") & " |"
+      row &= " " & (if nimV > 0 and cV > 0: (nimV / cV).formatFloat(ffDecimal,
+          2) & "x" else: "-") & " |"
       body &= row & "\n"
     const pyFrag = "bench/.md_python.md"
     if fileExists(pyFrag):
-      body &= "\n**Python binding vs stdlib** (`nimble benchPython`)\n\n" & readFile(pyFrag)
+      body &= "\n**Python binding vs stdlib** (`nimble benchPython`)\n\n" &
+          readFile(pyFrag)
     else:
       stderr.writeLine("[readme] no " & pyFrag & " -- run `nimble benchPython` too for the Python comparison")
     spliceReadme(machineSlug(), body)
