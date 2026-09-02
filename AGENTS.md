@@ -52,6 +52,10 @@ Three tiers, each catching what the others cannot:
 - C ABI: hand-written `include/UniAccurate.h` kept in sync with
   `src/UniAccurate/c_api.nim`; `tests/c` links the header against the lib.
   Built `--app:staticlib`/`--app:lib --noMain --mm:arc -d:release`.
+- A change to `c_api.nim` is verified by `ctest`, `pyTest` and, where there
+  is one, `wasmTest`: three linkages, three runtime bootstraps. A green
+  `ctest` alone proved nothing the day the shared build lost its
+  initializer and every registry answered with the sentinel.
 - C symbols `ua_*`; lib `libUniAccurate`; header `UniAccurate.h`.
 - SIMD layer (`-d:simd`, ADR-0005): dispatch at the umbrella and C ABI, never in
   `algorithms/` (vgraph back-edge). Compensated SIMD returns `(T, bool)`; the C
