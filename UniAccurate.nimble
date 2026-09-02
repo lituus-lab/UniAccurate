@@ -239,18 +239,18 @@ const
     else: ""
 
 task clib, "C shared library":
-  exec "nim c --app:lib --noMain --mm:arc -d:release -o:" & sharedLib & macArgs &
+  exec "nim c --app:lib -d:noAutoInit --noMain --mm:arc -d:release -o:" & sharedLib & macArgs &
        " src/UniAccurate/c_api.nim"
   done "clib"
 
 task clibStatic, "C static library":
-  exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -o:" & staticLib &
+  exec "nim c --app:staticlib -d:noAutoInit --noMain --mm:arc -d:release -o:" & staticLib &
        " src/UniAccurate/c_api.nim"
   done "clibStatic"
 
 task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # CPython on Windows is MSVC-built and cannot link MinGW output.
-  exec "nim c --cc:vcc --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release" &
+  exec "nim c --cc:vcc --app:staticlib -d:noAutoInit --noMain --mm:arc -d:release" &
        " -o:UniAccurate.lib src/UniAccurate/c_api.nim"
   done "clibMsvc"
 
@@ -318,12 +318,12 @@ task testSimd, "Scalar Nim tests compiled under -d:simd (host ISA)":
   done "testSimd"
 
 task clibSimd, "C shared library with -d:simd (host ISA)":
-  exec "nim c --app:lib --noMain --mm:arc -d:release -d:simd" & simdArch &
+  exec "nim c --app:lib -d:noAutoInit --noMain --mm:arc -d:release -d:simd" & simdArch &
        " -o:" & sharedLib & macArgs & " src/UniAccurate/c_api.nim"
   done "clibSimd"
 
 task ctestSimd, "C ABI tests with -d:simd (host ISA)":
-  exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -d:simd" & simdArch &
+  exec "nim c --app:staticlib -d:noAutoInit --noMain --mm:arc -d:release -d:simd" & simdArch &
        " -o:" & staticLib & " src/UniAccurate/c_api.nim"
   exec makeExe & " -C tests/c" & makeWinArgs
   done "ctestSimd"
