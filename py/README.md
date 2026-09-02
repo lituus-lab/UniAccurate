@@ -15,7 +15,7 @@ plus the matching compensated and correctly-rounded dot products.
 ## Install
 
 ```bash
-pip install uniaccurate
+pip install lituus-uniaccurate
 ```
 
 Prebuilt wheels ship for Linux, macOS and Windows, CPython 3.9-3.13. No Nim

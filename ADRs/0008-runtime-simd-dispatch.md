@@ -24,7 +24,7 @@ doesn't.
 
 The existing `-d:simd -d:avx2`/`-d:avx512` compile-time path (ADR-0005) bakes
 one ISA into the binary at build time. That's fine for a Nim consumer who
-controls their own build, but the C ABI feeds `pip install uniaccurate`: the
+controls their own build, but the C ABI feeds `pip install lituus-uniaccurate`: the
 published wheel is one binary distributed to unknown hardware, and it has
 never passed `-d:simd` at all -- `clib`/`pyLib`/`buildCython`/`pyWheel` in
 `UniAccurate.nimble` pass no such flag. Every wheel user has been getting the
@@ -163,7 +163,7 @@ path, all confirmed present at `b3ee77f` (before this ADR) and all since fixed:
 
 ## Consequences
 
-- `pip install uniaccurate` gets AVX2/AVX-512 dot products automatically, no
+- `pip install lituus-uniaccurate` gets AVX2/AVX-512 dot products automatically, no
   build flag, no wheel-matrix change.
 - `simd.nim` is no longer an empty module without `-d:simd` (see ADR-0005's
   amendment) -- the dot templates and their small import set are now
